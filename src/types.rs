@@ -9,6 +9,7 @@ pub enum MirandaExpr {
     MirandaKeyword(Keyword),
     MirandaList(Vec<MirandaExpr>),
     MirandaFunction(MirandaFunc),
+    MirandaIdentifier(String),
 }
 
 #[derive(Debug)]

@@ -1,9 +1,11 @@
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag},
-    character::complete::{char, digit1, one_of},
-    combinator::{map, map_res,value},
+    character::complete::{alphanumeric1, char, digit1, one_of},
+    combinator::recognize,
+    combinator::{map, map_res, value},
     error::VerboseError,
+    multi::many0,
     sequence::{delimited, pair, preceded},
     IResult,
 };
@@ -95,27 +97,57 @@ fn parse_string_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<
     Ok((input, MirandaExpr::MirandaString(chr.to_string())))
 }
 
-fn parse_keyword(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
-    let keywords: Vec<&str> = vec!["if", "where", "otherwise", "type"];
+// fn parse_keyword(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+//     let keywords: Vec<&str> = vec!["if", "where", "otherwise", "type"];
 
-    for keyword in keywords {
-        match tag(keyword)(input) {
-            Ok((i, _)) => {
-                let kw = match keyword {
-                    "if" => Keyword::If,
-                    "where" => Keyword::Where,
-                    "otherwise" => Keyword::Otherwise,
-                    "type" => Keyword::Type,
-                    _ => unreachable!(),
-                };
-                return Ok((i, MirandaExpr::MirandaKeyword(kw)));
-            },
-            Err(_) => continue,
-        };
-    }
+//     for keyword in keywords {
+//         match tag(keyword)(input) {
+//             Ok((i, _)) => {
+//                 let kw = match keyword {
+//                     "if" => Keyword::If,
+//                     "where" => Keyword::Where,
+//                     "otherwise" => Keyword::Otherwise,
+//                     "type" => Keyword::Type,
+//                     _ => unreachable!(),
+//                 };
+//                 return Ok((i, MirandaExpr::MirandaKeyword(kw)));
+//             },
+//             Err(e) => continue,
+//         };
+//     }
 
-    let e = nom::Err::Incomplete(nom::Needed::new(0));
-    return Err(e);
+//     let e = nom::Err::Incomplete(nom::Needed::new(0));
+//     return Err(e);
+// }
+
+// named!(lower<char>, one_of!("abcdefghijklmnopqrstuvwxyz"));
+
+fn lower(input: &str) -> IResult<&str, char, VerboseError<&str>> {
+    let l_case_chars = "abcdefghijklmnopqrstuvwxyz";
+    let (rest_input, matched) = match one_of(l_case_chars)(input) {
+        Ok(x) => x,
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest_input, matched))
+}
+
+fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    // identifier should not start with number
+    // run lower parser first then run parser that accepts a-zA-Z0-9'
+    let (rest_input, matched) = match recognize(pair(
+        pair(lower, many0(alt((alphanumeric1, tag("_"))))),
+        alt((tag("'"), tag(""))),
+    ))(input)
+    {
+        Ok((r_input, matched)) => (r_input, matched),
+        Err(e) => return Err(e),
+    };
+
+    Ok((
+        rest_input,
+        MirandaExpr::MirandaIdentifier(matched.to_string()),
+    ))
 }
 
 #[cfg(test)]
@@ -252,5 +284,28 @@ mod tests {
         };
 
         assert_eq!(value, "This is a string");
+    }
+
+    #[test]
+    fn lower_case_test() {
+        let value = match lower("abcde") {
+            Ok((_, matched)) => matched,
+            Err(_) => panic!("Failed to match"),
+        };
+
+        assert_eq!(value, 'a');
+    }
+
+    #[test]
+    fn parse_identifier_test() {
+        let value = match parse_identifier("hello123_world") {
+            Ok((_, matched)) => match matched {
+                MirandaIdentifier(x) => x,
+                _ => panic!("Error"),
+            },
+            Err(_) => panic!("Could not parse identifier"),
+        };
+
+        assert_eq!(value, "hello123_world".to_string());
     }
 }
