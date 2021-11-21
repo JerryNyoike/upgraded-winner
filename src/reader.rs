@@ -1,11 +1,12 @@
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag},
-    character::complete::{alphanumeric1, char, digit1, one_of},
+    character::complete::{alphanumeric1, char, digit1, i32, one_of},
     combinator::recognize,
     combinator::{map, map_res, value},
     error::VerboseError,
     multi::many0,
+    multi::separated_list0,
     sequence::{delimited, pair, preceded},
     IResult,
 };
@@ -16,8 +17,30 @@ fn parens(input: &str) -> IResult<&str, &str> {
     delimited(char('('), is_not(")"), char(')'))(input)
 }
 
-fn list(input: &str) -> IResult<&str, &str> {
-    delimited(char('['), is_not("]"), char(']'))(input)
+fn parse_integer(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (rest_input, matched) = match i32(input) {
+        Ok(x) => x,
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest_input, MirandaExpr::MirandaNum(matched)))
+}
+
+fn list(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
+    // we can have a list of numbers, characters or strings
+    delimited(
+        char('['),
+        separated_list0(
+            tag(","),
+            alt((
+                parse_integer,
+                parse_string_literal,
+                parse_char_literal,
+                parse_bool,
+            )),
+        ),
+        char(']'),
+    )(input)
 }
 
 fn comment(input: &str) -> IResult<&str, ()> {
@@ -162,7 +185,21 @@ mod tests {
 
     #[test]
     fn list_test() {
-        assert_eq!(list("[1,2,3]"), Ok(("", "1,2,3")));
+        let val = match list("[1,2,3]") {
+            Ok((_, matched)) => {
+                let mut vals = vec![];
+                for m in matched {
+                    match m {
+                        MirandaNum(n) => vals.push(n),
+                        _ => panic!("Not a list of integers"),
+                    }
+                }
+                vals
+            }
+            Err(_) => panic!("Failed to parse list."),
+        };
+
+        assert_eq!(val, vec![1, 2, 3])
     }
 
     #[test]
@@ -307,5 +344,18 @@ mod tests {
         };
 
         assert_eq!(value, "hello123_world".to_string());
+    }
+
+    #[test]
+    fn parse_integer_test() {
+        let val = match parse_integer("12345") {
+            Ok((_, matched)) => match matched {
+                MirandaNum(n) => n,
+                _ => panic!("Not a number"),
+            },
+            Err(_) => panic!("Failed"),
+        };
+
+        assert_eq!(val, 12345)
     }
 }
