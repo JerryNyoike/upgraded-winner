@@ -241,6 +241,15 @@ mod tests {
         };
 
         assert_eq!(value, 123);
+        let value = match parse_num("-123") {
+            Ok((_, mirand)) => match mirand {
+                MirandaNum(x) => x,
+                _ => panic!("this test has failed...like you"),
+            },
+            Err(_) => panic!("what did you expect"),
+        };
+
+        assert_eq!(value, -123);
     }
 
     #[test]
@@ -344,6 +353,16 @@ mod tests {
         };
 
         assert_eq!(value, "hello123_world".to_string());
+
+        let value = match parse_identifier("hello123_world'") {
+            Ok((_, matched)) => match matched {
+                MirandaIdentifier(x) => x,
+                _ => panic!("Error"),
+            },
+            Err(_) => panic!("Could not parse identifier"),
+        };
+
+        assert_eq!(value, "hello123_world'".to_string());
     }
 
     #[test]
@@ -356,6 +375,17 @@ mod tests {
             Err(_) => panic!("Failed"),
         };
 
-        assert_eq!(val, 12345)
+        assert_eq!(val, 12345);
+
+        let val = match parse_integer("-12345") {
+            Ok((_, matched)) => match matched {
+                MirandaNum(n) => n,
+                _ => panic!("Not a number"),
+            },
+            Err(_) => panic!("Failed"),
+        };
+
+        assert_eq!(val, -12345);
+
     }
 }
