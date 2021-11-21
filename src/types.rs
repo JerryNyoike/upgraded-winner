@@ -4,6 +4,7 @@
 pub enum MirandaExpr {
     MirandaBoolean(bool),
     MirandaNum(i32),
+    MirandaFloat(f32),
     MirandaChar(char),
     MirandaString(String),
     MirandaKeyword(Keyword),
@@ -13,7 +14,7 @@ pub enum MirandaExpr {
 }
 
 #[derive(Debug)]
-enum MirandaFunc {
+pub enum MirandaFunc {
     UserDefined(UserFunc),
     CoreFunc,
 }
@@ -37,8 +38,8 @@ pub enum Keyword {
 }
 
 #[derive(Debug)]
-struct UserFunc {
+pub struct UserFunc {
     frame_id: u32,
 }
 
-struct Env {}
+pub struct Env {}
