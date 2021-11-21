@@ -28,7 +28,7 @@ pub enum BuiltIn {
 }
 
 #[derive(Debug)]
-pub enum Keyword{
+pub enum Keyword {
     Where,
     If,
     Otherwise,

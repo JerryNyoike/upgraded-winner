@@ -1,14 +1,11 @@
 use nom::{
     branch::alt,
-    bytes::complete::is_not,
-    bytes::complete::tag,
+    bytes::complete::{is_not, tag},
     character::complete::{char, digit1, one_of},
-    combinator::{cut, map, map_res, opt, value},
+    combinator::{map, map_res,value},
     error::VerboseError,
     sequence::{delimited, pair, preceded},
     IResult,
-    error::ErrorKind,
-    error::Error,
 };
 
 use crate::types::*;
@@ -72,9 +69,8 @@ fn parse_if(input: &str) -> IResult<&str, &str> {
     todo!()
 }
 
-
-fn parse_char_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>>{
-    let (input, chr ) = match delimited(char('\''), is_not("'"), char('\''))(input) {
+fn parse_char_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (input, chr) = match delimited(char('\''), is_not("'"), char('\''))(input) {
         Ok(x) => x,
         Err(e) => return Err(e),
     };
@@ -87,31 +83,39 @@ fn parse_char_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&s
         }
     };
 
-    Ok(
-        (input,
-        MirandaExpr::MirandaChar(c))
-    )
+    Ok((input, MirandaExpr::MirandaChar(c)))
 }
 
-fn parse_string_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>>{
-    let (input, chr ) = match delimited(char('"'), is_not("\""), char('"'))(input) {
+fn parse_string_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (input, chr) = match delimited(char('"'), is_not("\""), char('"'))(input) {
         Ok(x) => x,
         Err(e) => return Err(e),
     };
 
-    Ok(
-        (input,
-        MirandaExpr::MirandaString(chr.to_string()))
-    )
+    Ok((input, MirandaExpr::MirandaString(chr.to_string())))
 }
 
 fn parse_keyword(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
-    // let keywords = vec!["if", "where", "otherwise", "type"];
-    // let m
+    let keywords: Vec<&str> = vec!["if", "where", "otherwise", "type"];
 
-    // for keyword in keywords {
+    for keyword in keywords {
+        match tag(keyword)(input) {
+            Ok((i, _)) => {
+                let kw = match keyword {
+                    "if" => Keyword::If,
+                    "where" => Keyword::Where,
+                    "otherwise" => Keyword::Otherwise,
+                    "type" => Keyword::Type,
+                    _ => unreachable!(),
+                };
+                return Ok((i, MirandaExpr::MirandaKeyword(kw)));
+            },
+            Err(_) => continue,
+        };
+    }
 
-    // }
+    let e = nom::Err::Incomplete(nom::Needed::new(0));
+    return Err(e);
 }
 
 #[cfg(test)]
