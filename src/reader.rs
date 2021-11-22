@@ -85,15 +85,13 @@ fn parse_if(_input: &str) -> IResult<&str, (MirandaExpr, &str), VerboseError<&st
     // an if is preceded by a comma and ended by an empty string or a newline character which shows
     // we have moved to the next guard or end of function definition
     let bool_combinator = preceded(multispace1, alt((is_not("\n"), is_not("\r"))));
-    let mut if_combinator = preceded(
-        multispace0,
-        delimited(tag("if"), bool_combinator, alt((tag("\n"), tag("")))),
-    );
-    let (input, if_stmt, cond) = match parse_keyword(_input) {
-        Ok((inp, if_expr)) => {
+    let if_combinator = delimited(tag("if"), bool_combinator, alt((tag("\n"), tag(""))));
+
+    let (input, if_stmt, cond) = match parse_keyword(_input.trim()) {
+        Ok((_, if_expr)) => {
             // if keyword matched now get the boolean expression
             // TODO replace alt parser with a parser for a boolean expression
-            match if_combinator(inp) {
+            match preceded(multispace0, if_combinator)(_input.trim()) {
                 Ok((rest_input, matched)) => {
                     // matched boolean expression
                     (rest_input, if_expr, matched)
@@ -425,6 +423,12 @@ mod tests {
             Err(e) => panic!("Failed to parse if: {}", e),
         };
 
+        let wspace_input = " if a>b \n";
+        let val2 = match parse_if(wspace_input) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse if: {}", e),
+        };
         assert_eq!(val, (MirandaKeyword(Keyword::If), "a>b"));
+        assert_eq!(val2, (MirandaKeyword(Keyword::If), "a>b"));
     }
 }
