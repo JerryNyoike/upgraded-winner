@@ -403,16 +403,22 @@ mod tests {
     #[test]
     fn parse_keyword_test() {
         let keywords: Vec<&str> = vec!["if", "where", "otherwise", "type"];
+        let mut matched_keywords = vec![];
 
         for kw in keywords {
             let _ = match parse_keyword(kw) {
                 Ok((_, matched)) => match matched {
-                    MirandaKeyword(x) => x,
+                    MirandaKeyword(x) => matched_keywords.push(x),
                     _ => panic!("test failed"),
                 },
                 Err(_) => panic!("test failed"),
             };
         }
+
+        assert_eq!(Keyword::If, matched_keywords[0]);
+        assert_eq!(Keyword::Where, matched_keywords[1]);
+        assert_eq!(Keyword::Otherwise, matched_keywords[2]);
+        assert_eq!(Keyword::Type, matched_keywords[3]);
     }
 
     #[test]
