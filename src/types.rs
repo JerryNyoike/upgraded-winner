@@ -1,6 +1,6 @@
 // Supported types for this Miranda
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MirandaExpr {
     MirandaBoolean(bool),
     MirandaNum(i32),
@@ -13,7 +13,7 @@ pub enum MirandaExpr {
     MirandaIdentifier(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MirandaFunc {
     UserDefined(UserFunc),
     CoreFunc,
@@ -29,7 +29,7 @@ pub enum BuiltIn {
     Mod,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Keyword {
     Where,
     If,
@@ -37,7 +37,7 @@ pub enum Keyword {
     Type,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct UserFunc {
     frame_id: u32,
 }
