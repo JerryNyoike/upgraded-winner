@@ -3,7 +3,7 @@
 #[derive(Debug, PartialEq)]
 pub enum MirandaExpr {
     MirandaBoolean(bool),
-    MirandaNum(i32),
+    MirandaInt(i32),
     MirandaFloat(f32),
     MirandaChar(char),
     MirandaString(String),
