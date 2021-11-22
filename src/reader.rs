@@ -1,7 +1,7 @@
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag},
-    character::complete::{alphanumeric1, char, digit1, i32, one_of},
+    character::complete::{alphanumeric1, char, digit1, i32, multispace0, multispace1, one_of},
     combinator::recognize,
     combinator::{map, map_res, peek, value},
     error::VerboseError,
@@ -81,18 +81,31 @@ fn parse_builtin_op(input: &str) -> IResult<&str, BuiltIn, VerboseError<&str>> {
     ))
 }
 
-// fn parse_if(_input: &str) -> IResult<&str, &str> {
-//     // get condition
-//     // let (input, cond) = match delimited(tag("if"), is_not("then"), tag("then"))(input) {
-//     //     Ok(x) => x,
-//     //     Err(e) => return Err(e),
-//     // };
+fn parse_if(_input: &str) -> IResult<&str, (MirandaExpr, &str), VerboseError<&str>> {
+    // an if is preceded by a comma and ended by an empty string or a newline character which shows
+    // we have moved to the next guard or end of function definition
+    let bool_combinator = preceded(multispace1, alt((is_not("\n"), is_not("\r"))));
+    let mut if_combinator = preceded(
+        multispace0,
+        delimited(tag("if"), bool_combinator, alt((tag("\n"), tag("")))),
+    );
+    let (input, if_stmt, cond) = match parse_keyword(_input) {
+        Ok((inp, if_expr)) => {
+            // if keyword matched now get the boolean expression
+            // TODO replace alt parser with a parser for a boolean expression
+            match if_combinator(inp) {
+                Ok((rest_input, matched)) => {
+                    // matched boolean expression
+                    (rest_input, if_expr, matched)
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Err(e) => return Err(e),
+    };
 
-//     // let (input, cond) = match
-
-//     // Ok((input, ""))
-//     todo!()
-// }
+    Ok((input, (if_stmt, cond)))
+}
 
 fn parse_char_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let (input, chr) = match delimited(char('\''), is_not("'"), char('\''))(input) {
@@ -392,6 +405,7 @@ mod tests {
     #[test]
     fn parse_keyword_test() {
         let keywords: Vec<&str> = vec!["if", "where", "otherwise", "type"];
+
         for kw in keywords {
             let _ = match parse_keyword(kw) {
                 Ok((_, matched)) => match matched {
@@ -401,5 +415,16 @@ mod tests {
                 Err(_) => panic!("test failed"),
             };
         }
+    }
+
+    #[test]
+    fn parse_if_test() {
+        let input = "if a>b";
+        let val = match parse_if(input) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse if: {}", e),
+        };
+
+        assert_eq!(val, (MirandaKeyword(Keyword::If), "a>b"));
     }
 }
