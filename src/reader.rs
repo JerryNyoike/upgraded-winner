@@ -7,6 +7,7 @@ use nom::{
     error::VerboseError,
     multi::many0,
     multi::separated_list0,
+    number::complete::float,
     sequence::{delimited, pair, preceded},
     IResult,
 };
@@ -23,7 +24,7 @@ fn parse_integer(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> 
         Err(e) => return Err(e),
     };
 
-    Ok((rest_input, MirandaExpr::MirandaNum(matched)))
+    Ok((rest_input, MirandaExpr::MirandaInt(matched)))
 }
 
 fn list(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
@@ -57,10 +58,10 @@ fn parse_bool(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
 fn parse_num(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     alt((
         map_res(digit1, |digit_str: &str| {
-            digit_str.parse::<i32>().map(MirandaExpr::MirandaNum)
+            digit_str.parse::<i32>().map(MirandaExpr::MirandaInt)
         }),
         map(preceded(tag("-"), digit1), |digit_str: &str| {
-            MirandaExpr::MirandaNum(-1 * digit_str.parse::<i32>().unwrap())
+            MirandaExpr::MirandaInt(-1 * digit_str.parse::<i32>().unwrap())
         }),
     ))(input)
 }
@@ -163,7 +164,7 @@ fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str
         alt((tag("'"), tag(""))),
     ))(input)
     {
-        Ok((r_input, matched)) => (r_input, matched),
+        Ok(value) => value,
         Err(e) => return Err(e),
     };
 
@@ -171,6 +172,15 @@ fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str
         rest_input,
         MirandaExpr::MirandaIdentifier(matched.to_string()),
     ))
+}
+
+fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (input, value) = match float(input) {
+        Ok(val) => val,
+        Err(e) => return Err(e),
+    };
+
+    Ok((input, MirandaExpr::MirandaFloat(value)))
 }
 
 #[cfg(test)]
@@ -190,7 +200,7 @@ mod tests {
                 let mut vals = vec![];
                 for m in matched {
                     match m {
-                        MirandaNum(n) => vals.push(n),
+                        MirandaInt(n) => vals.push(n),
                         _ => panic!("Not a list of integers"),
                     }
                 }
@@ -234,7 +244,7 @@ mod tests {
     fn num_parse_test() {
         let value = match parse_num("123") {
             Ok((_, mirand)) => match mirand {
-                MirandaNum(x) => x,
+                MirandaInt(x) => x,
                 _ => panic!("this test has failed...like you"),
             },
             Err(_) => panic!("what did you expect"),
@@ -350,12 +360,45 @@ mod tests {
     fn parse_integer_test() {
         let val = match parse_integer("12345") {
             Ok((_, matched)) => match matched {
-                MirandaNum(n) => n,
+                MirandaInt(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
         };
 
         assert_eq!(val, 12345)
+    }
+
+    #[test]
+    fn parse_float_test() {
+        let val = match parse_float("11e-1") {
+            Ok((_, matched)) => match matched {
+                MirandaFloat(n) => n,
+                _ => panic!("Not a number"),
+            },
+            Err(_) => panic!("Failed"),
+        };
+
+        assert_eq!(val, 1.1);
+
+        let val = match parse_float(".42") {
+            Ok((_, matched)) => match matched {
+                MirandaFloat(n) => n,
+                _ => panic!("Not a number"),
+            },
+            Err(_) => panic!("Failed"),
+        };
+
+        assert_eq!(val, 0.42);
+
+        let val = match parse_float("-11e-1") {
+            Ok((_, matched)) => match matched {
+                MirandaFloat(n) => n,
+                _ => panic!("Not a number"),
+            },
+            Err(_) => panic!("Failed"),
+        };
+
+        assert_eq!(val, -1.1);
     }
 }
