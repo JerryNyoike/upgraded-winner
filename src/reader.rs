@@ -265,7 +265,7 @@ mod tests {
         assert_eq!(value, 123);
         let value = match parse_num("-123") {
             Ok((_, mirand)) => match mirand {
-                MirandaNum(x) => x,
+                MirandaInt(x) => x,
                 _ => panic!("this test has failed...like you"),
             },
             Err(_) => panic!("what did you expect"),
@@ -401,7 +401,7 @@ mod tests {
 
         let val = match parse_integer("-12345") {
             Ok((_, matched)) => match matched {
-                MirandaNum(n) => n,
+                MirandaInt(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
