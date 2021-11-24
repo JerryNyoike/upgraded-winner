@@ -4,7 +4,7 @@ use nom::{
     character::complete::{alphanumeric1, char, digit1, i32, multispace0, multispace1, one_of},
     combinator::recognize,
     combinator::{map, map_res, peek, value},
-    error::VerboseError,
+    error::{ParseError, VerboseError},
     multi::many0,
     multi::separated_list0,
     number::complete::float,
@@ -27,9 +27,9 @@ fn parse_integer(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> 
     Ok((rest_input, MirandaExpr::MirandaInt(matched)))
 }
 
-fn list(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
+fn list(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     // we can have a list of numbers, characters or strings
-    delimited(
+    let (r_input, matched) = match delimited(
         char('['),
         separated_list0(
             tag(","),
@@ -42,6 +42,12 @@ fn list(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
         ),
         char(']'),
     )(input)
+    {
+        Ok((r, found)) => (r, MirandaExpr::MirandaList(found)),
+        Err(e) => return Err(e),
+    };
+
+    Ok((r_input, matched))
 }
 
 fn comment(input: &str) -> IResult<&str, ()> {
@@ -186,6 +192,117 @@ fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str
     ))
 }
 
+fn parse_variable_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
+    let (input, matched) = match preceded(
+        multispace0,
+        preceded(
+            alt((tag("::"), tag(""))),
+            preceded(
+                multispace0,
+                alt((
+                    tag("bool"),
+                    tag("int"),
+                    tag("float"),
+                    tag("char"),
+                    tag("string"),
+                    tag("["),
+                )),
+            ),
+        ),
+    )(input)
+    {
+        Ok((r_inp, found)) => match found {
+            "bool" => (r_inp, MirandaType::Bool),
+            "int" => (r_inp, MirandaType::Int),
+            "float" => (r_inp, MirandaType::Float),
+            "char" => (r_inp, MirandaType::Char),
+            "string" => (r_inp, MirandaType::String),
+            "[" => {
+                let (r_inp, list_type) = match parse_variable_type(r_inp) {
+                    Ok(x) => x,
+                    Err(e) => return Err(e),
+                };
+                (r_inp, MirandaType::List(Box::new(list_type)))
+            }
+            _ => {
+                panic!("Expected type variable.")
+            }
+        },
+        Err(e) => return Err(e),
+    };
+
+    Ok((input, matched))
+}
+
+fn parse_variable_definition(
+    input: &str,
+) -> IResult<&str, (MirandaExpr, MirandaType, MirandaExpr), VerboseError<&str>> {
+    // variable definitions involve a tpye declaration and the actual initialization
+    // get identifier name
+    let (r_inp, identifier) = match parse_identifier(input) {
+        Ok(x) => x,
+        Err(e) => return Err(e),
+    };
+
+    let (rest, var_type) = match parse_variable_type(r_inp) {
+        Ok(x) => x,
+        Err(e) => return Err(e),
+    };
+
+    let (rest_input, value) = match preceded(
+        // the identifier
+        multispace0,
+        preceded(
+            parse_identifier,
+            preceded(
+                multispace0,
+                preceded(
+                    tag("="),
+                    preceded(
+                        multispace0,
+                        alt((
+                            parse_integer,
+                            parse_float,
+                            parse_bool,
+                            parse_char_literal,
+                            parse_string_literal,
+                        )),
+                    ),
+                ),
+            ),
+        ),
+    )(rest)
+    {
+        Ok((r, found)) => (r, found),
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest_input, (identifier, var_type, value)))
+}
+
+fn parse_user_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
+    // can return either a function declaration, variable declaration or user type declaration
+    todo!()
+}
+
+fn parse_variable_declaration(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    // the variable declaration starts with the type definition `var :: Type` followed by
+    // the variable definition var = value
+
+    // parse the declaration
+    // let ((input, declaration)) = match parse {
+
+    // };
+
+    // // parse the value
+    // let ((input, value)) = match {
+
+    // };
+
+    // Ok((input, (declaration, value)))
+    todo!()
+}
+
 fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let (input, value) = match float(input) {
         Ok(val) => val,
@@ -199,6 +316,8 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
 mod tests {
     use super::*;
     use crate::types::MirandaExpr::*;
+    use crate::types::MirandaType::*;
+    use std::string::String;
 
     #[test]
     fn parens_test() {
@@ -208,20 +327,14 @@ mod tests {
     #[test]
     fn list_test() {
         let val = match list("[1,2,3]") {
-            Ok((_, matched)) => {
-                let mut vals = vec![];
-                for m in matched {
-                    match m {
-                        MirandaInt(n) => vals.push(n),
-                        _ => panic!("Not a list of integers"),
-                    }
-                }
-                vals
-            }
+            Ok((_, matched)) => matched,
             Err(_) => panic!("Failed to parse list."),
         };
 
-        assert_eq!(val, vec![1, 2, 3])
+        assert_eq!(
+            val,
+            MirandaList(vec![MirandaInt(1), MirandaInt(2), MirandaInt(3)])
+        )
     }
 
     #[test]
@@ -265,7 +378,7 @@ mod tests {
         assert_eq!(value, 123);
         let value = match parse_num("-123") {
             Ok((_, mirand)) => match mirand {
-                MirandaNum(x) => x,
+                MirandaInt(x) => x,
                 _ => panic!("this test has failed...like you"),
             },
             Err(_) => panic!("what did you expect"),
@@ -401,7 +514,7 @@ mod tests {
 
         let val = match parse_integer("-12345") {
             Ok((_, matched)) => match matched {
-                MirandaNum(n) => n,
+                MirandaInt(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
@@ -479,5 +592,40 @@ mod tests {
         };
 
         assert_eq!(val, -1.1);
+    }
+
+    #[test]
+    fn parse_variable_type_test() {
+        let val = match parse_variable_type(" :: int") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Error parsing {}", e),
+        };
+
+        let string_val = match parse_variable_type(":: string") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Error parsing {}", e),
+        };
+
+        let list_val = match parse_variable_type(":: [string]") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Error parsing {}", e),
+        };
+
+        assert_eq!(Int, val);
+        assert_eq!(String, string_val);
+        assert_eq!(List(Box::new(String)), list_val);
+    }
+
+    #[test]
+    fn parse_variable_definition_test() {
+        let val = match parse_variable_definition("jerry :: int\n jerry = 1") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse var definition: {}", e),
+        };
+
+        assert_eq!(
+            val,
+            (MirandaIdentifier("jerry".to_string()), Int, MirandaInt(1))
+        )
     }
 }
