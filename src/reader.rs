@@ -12,8 +12,8 @@ use nom::{
     IResult,
 };
 
-use crate::types::*;
 use crate::type_checker::MirandaType;
+use crate::types::*;
 
 fn parens(input: &str) -> IResult<&str, &str> {
     delimited(char('('), is_not(")"), char(')'))(input)
@@ -193,42 +193,43 @@ fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str
     ))
 }
 
-fn parse_variable_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
-    let (input, matched) = match preceded(
-        multispace0,
-        preceded(
-            alt((tag("::"), tag(""))),
-            preceded(
-                multispace0,
-                alt((
-                    tag("bool"),
-                    tag("int"),
-                    tag("float"),
-                    tag("char"),
-                    tag("string"),
-                    tag("["),
-                )),
-            ),
-        ),
-    )(input)
+fn parse_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
+    match alt((
+        tag("bool"),
+        tag("int"),
+        tag("float"),
+        tag("char"),
+        tag("string"),
+        tag("["),
+    ))(input)
     {
-        Ok((r_inp, found)) => match found {
-            "bool" => (r_inp, MirandaType::Bool),
-            "int" => (r_inp, MirandaType::Int),
-            "float" => (r_inp, MirandaType::Float),
-            "char" => (r_inp, MirandaType::Char),
-            "string" => (r_inp, MirandaType::String),
+        Ok((rest, matched)) => match matched {
+            "bool" => Ok((rest, MirandaType::Bool)),
+            "int" => Ok((rest, MirandaType::Int)),
+            "float" => Ok((rest, MirandaType::Float)),
+            "char" => Ok((rest, MirandaType::Char)),
+            "string" => Ok((rest, MirandaType::String)),
             "[" => {
-                let (r_inp, list_type) = match parse_variable_type(r_inp) {
+                let (r_inp, list_type) = match parse_variable_type(rest) {
                     Ok(x) => x,
                     Err(e) => return Err(e),
                 };
-                (r_inp, MirandaType::List(Box::new(list_type)))
+                Ok((r_inp, MirandaType::List(Box::new(list_type))))
             }
             _ => {
                 panic!("Expected type variable.")
             }
         },
+    }
+}
+
+fn parse_variable_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
+    let (input, matched) = match preceded(
+        multispace0,
+        preceded(alt((tag("::"), tag(""))), preceded(multispace0, parse_type)),
+    )(input)
+    {
+        Ok((r_inp, found)) => (r_inp, found),
         Err(e) => return Err(e),
     };
 
@@ -280,28 +281,31 @@ fn parse_variable_definition(
 
     Ok((rest_input, (identifier, var_type, value)))
 }
+// fn parse_function_type(input: &str,) -> IResult<&str, (MirandaExpr, Vec<(MirandaExpr, MirandaType, MirandaExpr)>, MirandaExpr), VerboseError<&str>>
 
-fn parse_user_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
-    // can return either a function declaration, variable declaration or user type declaration
-    todo!()
-}
+fn parse_function_type(
+    input: &str,
+) -> IResult<&str, (MirandaExpr, Vec<MirandaType>), VerboseError<&str>> {
+    // a function's type takes the pattern add a b :: int -> int -> int
+    let (rest, first_param) = match parse_variable_type(input) {
+        Ok((r, found)) => (r, found),
+        Err(e) => return Err(e),
+    };
 
-fn parse_variable_declaration(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
-    // the variable declaration starts with the type definition `var :: Type` followed by
-    // the variable definition var = value
-
-    // parse the declaration
-    // let ((input, declaration)) = match parse {
-
-    // };
-
-    // // parse the value
-    // let ((input, value)) = match {
-
-    // };
-
-    // Ok((input, (declaration, value)))
-    todo!()
+    let (rest, other_params) =
+        match separated_list0(delimited(multispace0, tag("::"), multispace0), parse_type) {
+            Ok((r, types)) => {
+                let mut param_types = vec![];
+                for typ in types.iter() {
+                    match typ {
+                        Ok((rest_input, matched)) => param_types.push(matched),
+                        Err(e) => return Err(e),
+                    }
+                }
+                (r, param_types)
+            }
+            Err(e) => return Err(e),
+        };
 }
 
 fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
@@ -316,8 +320,8 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::MirandaExpr::*;
     use crate::type_checker::MirandaType;
+    use crate::types::MirandaExpr::*;
     use std::string::String;
 
     #[test]
@@ -626,7 +630,11 @@ mod tests {
 
         assert_eq!(
             val,
-            (MirandaIdentifier("jerry".to_string()), MirandaType::Int, MirandaInt(1))
+            (
+                MirandaIdentifier("jerry".to_string()),
+                MirandaType::Int,
+                MirandaInt(1)
+            )
         )
     }
 }
