@@ -13,6 +13,7 @@ use nom::{
 };
 
 use crate::types::*;
+use crate::type_checker::MirandaType;
 
 fn parens(input: &str) -> IResult<&str, &str> {
     delimited(char('('), is_not(")"), char(')'))(input)
@@ -316,7 +317,7 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
 mod tests {
     use super::*;
     use crate::types::MirandaExpr::*;
-    use crate::types::MirandaType::*;
+    use crate::type_checker::MirandaType;
     use std::string::String;
 
     #[test]
@@ -611,9 +612,9 @@ mod tests {
             Err(e) => panic!("Error parsing {}", e),
         };
 
-        assert_eq!(Int, val);
-        assert_eq!(String, string_val);
-        assert_eq!(List(Box::new(String)), list_val);
+        assert_eq!(MirandaType::Int, val);
+        assert_eq!(MirandaType::String, string_val);
+        assert_eq!(MirandaType::List(Box::new(MirandaType::String)), list_val);
     }
 
     #[test]
@@ -625,7 +626,7 @@ mod tests {
 
         assert_eq!(
             val,
-            (MirandaIdentifier("jerry".to_string()), Int, MirandaInt(1))
+            (MirandaIdentifier("jerry".to_string()), MirandaType::Int, MirandaInt(1))
         )
     }
 }
