@@ -30,6 +30,16 @@ pub enum BuiltIn {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum MirandaType {
+    Bool,
+    Int,
+    Float,
+    List(Box<MirandaType>),
+    Char,
+    String,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Keyword {
     Where,
     If,
