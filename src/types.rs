@@ -31,16 +31,6 @@ pub enum BuiltIn {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum MirandaType {
-    Bool,
-    Int,
-    Float,
-    List(Box<MirandaType>),
-    Char,
-    String,
-}
-
-#[derive(Debug, PartialEq)]
 pub enum Keyword {
     Where,
     If,
@@ -59,7 +49,7 @@ pub struct Env {
 }
 
 impl Env {
-    fn extend_var(&mut self, id: Ident, t: Type) {
+    fn extend_var(&mut self, id: Ident, t: MirandaType) {
         if let None = self.vars_table.get(&id) {
             // Type Ident already defined
             println!("Variable {} {} already defined", t.to_string(), id);
@@ -68,7 +58,7 @@ impl Env {
         self.vars_table.insert(id.clone(), VarType::new(id, t));
     }
 
-    fn extend_fn(&mut self, id: Ident, t: Vec<Type>) {
+    fn extend_fn(&mut self, id: Ident, t: Vec<MirandaType>) {
         if let None = self.funs_table.get(&id) {
             // Type Ident already defined
             let fun = FunType::new(id, t);
@@ -78,5 +68,10 @@ impl Env {
         self.funs_table.insert(id.clone(), FunType::new(id, t));
     }
 
-    fn check(&self, t: Type){}
+    fn check(&self, t: MirandaType){}
+}
+
+
+mod tests {
+
 }
