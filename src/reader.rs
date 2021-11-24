@@ -220,6 +220,7 @@ fn parse_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
                 panic!("Expected type variable.")
             }
         },
+        Err(e) => return Err(e),
     }
 }
 
@@ -281,31 +282,42 @@ fn parse_variable_definition(
 
     Ok((rest_input, (identifier, var_type, value)))
 }
-// fn parse_function_type(input: &str,) -> IResult<&str, (MirandaExpr, Vec<(MirandaExpr, MirandaType, MirandaExpr)>, MirandaExpr), VerboseError<&str>>
 
-fn parse_function_type(
-    input: &str,
-) -> IResult<&str, (MirandaExpr, Vec<MirandaType>), VerboseError<&str>> {
+fn parse_typers(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
+    // -> int -> [int]
+    preceded(
+        tag("->"),
+        separated_list0(delimited(multispace0, tag("->"), multispace0), parse_type),
+    )(input)
+}
+
+pub fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
+    let mut param_types = vec![];
     // a function's type takes the pattern add a b :: int -> int -> int
-    let (rest, first_param) = match parse_variable_type(input) {
-        Ok((r, found)) => (r, found),
+    let (rest, _) = match parse_variable_type(input) {
+        Ok((r, found)) => {
+            param_types.push(found.clone());
+            (r, found)
+        }
         Err(e) => return Err(e),
     };
 
-    let (rest, other_params) =
-        match separated_list0(delimited(multispace0, tag("::"), multispace0), parse_type) {
-            Ok((r, types)) => {
-                let mut param_types = vec![];
-                for typ in types.iter() {
-                    match typ {
-                        Ok((rest_input, matched)) => param_types.push(matched),
-                        Err(e) => return Err(e),
-                    }
-                }
-                (r, param_types)
+    let (rest_input, _) = match preceded(
+        multispace0,
+        separated_list0(alt((tag("->"), tag(" -> "))), parse_type),
+    )(rest)
+    {
+        Ok((r, types)) => {
+            println!("{:?}", types);
+            for typ in types.iter() {
+                param_types.push(typ.clone())
             }
-            Err(e) => return Err(e),
-        };
+            (r, types)
+        }
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest_input, param_types))
 }
 
 fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
@@ -635,6 +647,40 @@ mod tests {
                 MirandaType::Int,
                 MirandaInt(1)
             )
+        )
+    }
+
+    #[test]
+    fn parse_function_type_test() {
+        let val = match parse_function_type(" :: int -> int -> [int]") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse function type: {}", e),
+        };
+
+        // assert_eq!(
+        //     val,
+        //     vec![
+        //         MirandaType::Int,
+        //         MirandaType::Int,
+        //         MirandaType::List(Box::new(MirandaType::Int))
+        //     ]
+        // )
+    }
+
+    #[test]
+    fn parse_typers_test() {
+        let val = match parse_typers("->int->int->[int]") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed {}", e),
+        };
+
+        assert_eq!(
+            val,
+            vec![
+                MirandaType::Int,
+                MirandaType::Int,
+                MirandaType::List(Box::new(MirandaType::Int))
+            ]
         )
     }
 }
