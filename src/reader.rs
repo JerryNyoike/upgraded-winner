@@ -294,7 +294,7 @@ fn parse_param_types(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseErro
     )(input)
 }
 
-pub fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
+fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
     let mut param_types = vec![];
     // a function's type takes the pattern add a b :: int -> int -> int
     let (rest, _) = match parse_variable_type(input) {
