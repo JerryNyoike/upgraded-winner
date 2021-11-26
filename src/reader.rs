@@ -283,11 +283,14 @@ fn parse_variable_definition(
     Ok((rest_input, (identifier, var_type, value)))
 }
 
-fn parse_typers(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
+fn parse_param_types(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
     // -> int -> [int]
     preceded(
-        tag("->"),
-        separated_list0(delimited(multispace0, tag("->"), multispace0), parse_type),
+        multispace0,
+        preceded(
+            delimited(multispace0, tag("->"), multispace0),
+            separated_list0(delimited(multispace0, tag("->"), multispace0), parse_type),
+        ),
     )(input)
 }
 
@@ -302,11 +305,7 @@ pub fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, Verbo
         Err(e) => return Err(e),
     };
 
-    let (rest_input, _) = match preceded(
-        multispace0,
-        separated_list0(alt((tag("->"), tag(" -> "))), parse_type),
-    )(rest)
-    {
+    let (rest_input, _) = match parse_param_types(rest) {
         Ok((r, types)) => {
             println!("{:?}", types);
             for typ in types.iter() {
@@ -657,19 +656,19 @@ mod tests {
             Err(e) => panic!("Failed to parse function type: {}", e),
         };
 
-        // assert_eq!(
-        //     val,
-        //     vec![
-        //         MirandaType::Int,
-        //         MirandaType::Int,
-        //         MirandaType::List(Box::new(MirandaType::Int))
-        //     ]
-        // )
+        assert_eq!(
+            val,
+            vec![
+                MirandaType::Int,
+                MirandaType::Int,
+                MirandaType::List(Box::new(MirandaType::Int))
+            ]
+        )
     }
 
     #[test]
-    fn parse_typers_test() {
-        let val = match parse_typers("->int->int->[int]") {
+    fn parse_param_types_test() {
+        let val = match parse_param_types(" -> int -> [int]") {
             Ok((_, matched)) => matched,
             Err(e) => panic!("Failed {}", e),
         };
@@ -677,7 +676,6 @@ mod tests {
         assert_eq!(
             val,
             vec![
-                MirandaType::Int,
                 MirandaType::Int,
                 MirandaType::List(Box::new(MirandaType::Int))
             ]
