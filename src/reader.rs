@@ -6,12 +6,15 @@ use nom::{
     combinator::{map, map_res, peek, value},
     error::{ParseError, VerboseError},
     multi::many0,
-    multi::separated_list0,
+    multi::{separated_list0, separated_list1},
     number::complete::float,
-    sequence::{delimited, pair, preceded},
+    sequence::{delimited, pair, preceded, terminated},
     IResult,
 };
 
+use std::collections::HashMap;
+
+use crate::type_checker::FunType;
 use crate::type_checker::MirandaType;
 use crate::types::*;
 
@@ -89,7 +92,7 @@ fn parse_builtin_op(input: &str) -> IResult<&str, BuiltIn, VerboseError<&str>> {
     ))
 }
 
-fn parse_if(_input: &str) -> IResult<&str, (MirandaExpr, &str), VerboseError<&str>> {
+fn parse_if(_input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     // an if is preceded by a comma and ended by an empty string or a newline character which shows
     // we have moved to the next guard or end of function definition
     let bool_combinator = preceded(multispace1, alt((is_not("\n"), is_not("\r"))));
@@ -110,7 +113,7 @@ fn parse_if(_input: &str) -> IResult<&str, (MirandaExpr, &str), VerboseError<&st
         Err(e) => return Err(e),
     };
 
-    Ok((input, (if_stmt, cond)))
+    Ok((input, MirandaExpr::MirandaIf(cond.to_string())))
 }
 
 fn parse_char_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
@@ -318,6 +321,82 @@ fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseEr
 
     Ok((rest_input, param_types))
 }
+
+fn parse_function_guard(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
+    let (rest, matched) =
+        match separated_list0(tag(","), alt((parse_if, parse_string_literal)))(input) {
+            Ok((rest, matched)) => (rest, matched),
+            Err(e) => return Err(e),
+        };
+
+    Ok((rest, matched))
+}
+
+// fn parse_function_definition(
+//     input: &str,
+// ) -> IResult<
+//     &str,
+//     (
+//         FunType,
+//         Vec<MirandaExpr>,
+//         HashMap<&str, &str>,
+//         HashMap<&str, &str>,
+//     ),
+//     VerboseError<&str>,
+// > {
+//     // add a b :: int -> int -> int
+//     // add a b = a + b, if a > b
+//     //         = b + a, if b > a
+//     //         where
+//     //         x = a * a
+//     let ((rest, fun_identifier)) = match parse_identifier(input) {
+//         Ok((r, iden)) => match iden {
+//             MirandaExpr::MirandaIdentifier(name) => (r, name),
+//             _ => panic!("Not a Miranda identifier"),
+//         },
+//         Err(e) => return Err(e),
+//     };
+
+//     let ((fun_type_def, param_identifiers)) =
+//         match separated_list1(multispace0, parse_identifier)(rest) {
+//             Ok((r, idens)) => (r, idens),
+//             Err(e) => return Err(e),
+//         };
+
+//     let (function_def, param_types) = match parse_function_type(fun_type_def) {
+//         Ok((r, p_types)) => (r, p_types),
+//         Err(e) => return Err(e),
+//     };
+
+//     let fun_type = FunType(fun_identifier, param_types);
+
+//     let function_body =
+//         match terminated(separated_list1(multispace0, parse_identifier), tag("="))(function_def) {
+//             Ok((r, _)) => r,
+//             Err(e) => return Err(e),
+//         };
+//     //
+//     //terminated(alt((parse_integer, parse_float)), multispace1),
+//     let (rest_input, fun_exprs) = match peek(separated_list1(
+//         alt((tag("="), tag("\n"))),
+//         parse_function_guard,
+//     ))(function_body)
+//     {
+//         Ok((r, matched)) => {
+//             if matched.empty() {
+//             } else {
+//                 (r, matched)
+//             }
+//         }
+//         Err(e) => {
+//             //attempt to match single expr
+//             match separated_list1(tag("\n"), alt((parse_integer, parse_float)))(function_def) {
+//                 Ok((r, matched)) => (r, matched),
+//                 Err(e) => return Err(e),
+//             }
+//         }
+//     };
+// }
 
 fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let (input, value) = match float(input) {
@@ -573,8 +652,8 @@ mod tests {
             Ok((_, matched)) => matched,
             Err(e) => panic!("Failed to parse if: {}", e),
         };
-        assert_eq!(val, (MirandaKeyword(Keyword::If), "a>b"));
-        assert_eq!(val2, (MirandaKeyword(Keyword::If), "a>b"));
+        assert_eq!(val, (MirandaIf("a>b".to_string())));
+        assert_eq!(val2, (MirandaIf("a>b".to_string())));
     }
 
     #[test]

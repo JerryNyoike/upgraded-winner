@@ -12,6 +12,7 @@ pub enum MirandaExpr {
     MirandaList(Vec<MirandaExpr>),
     MirandaFunction(MirandaFunc),
     MirandaIdentifier(String),
+    MirandaIf(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -68,9 +69,7 @@ impl Env {
         self.funs_table.insert(id.clone(), FunType::new(id, t));
     }
 
-    fn check(&self, t: MirandaType){}
+    fn check(&self, t: MirandaType) {}
 }
 
-
-mod tests {
-}
+mod tests {}
