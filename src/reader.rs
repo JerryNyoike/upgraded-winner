@@ -99,7 +99,7 @@ fn parse_if(_input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let bool_combinator = preceded(multispace1, alt((is_not("\n"), is_not("\r"))));
     let if_combinator = preceded(
         multispace0,
-        delimited(tag("if"), bool_combinator, alt((tag("\n"), tag("")))),
+        delimited(tag("if"), bool_combinator, multispace0),
     );
 
     let (input, if_stmt, cond) = match parse_keyword(_input.trim()) {
@@ -797,32 +797,32 @@ mod tests {
 
     #[test]
     fn parse_function_definition_test() {
-        let inp = "add :: int -> int -> int \n add a b = 15, if a>b \n 16, if b>a";
+        let inp = "add :: int -> int -> int \n add a b = 15, if a>b\n = 16, if b>a";
 
         let value = match parse_function_definition(inp) {
             Ok((_, matched)) => matched,
             Err(e) => panic!("Failed to parse: {}", e),
         };
 
-        // assert_eq!(
-        //     value,
-        //     (
-        //         FunType("add".to_string(), vec![MirandaType::Int, MirandaType::Int]),
-        //         vec![
-        //             VarType("a".to_string(), MirandaType::Int),
-        //             VarType("b".to_string(), MirandaType::Int)
-        //         ],
-        //         vec![
-        //             vec![
-        //                 MirandaExpr::MirandaInt(15),
-        //                 MirandaExpr::MirandaIf("a>b".to_string())
-        //             ],
-        //             vec![
-        //                 MirandaExpr::MirandaInt(16),
-        //                 MirandaExpr::MirandaIf("b>a".to_string())
-        //             ]
-        //         ]
-        //     )
-        // )
+        assert_eq!(
+            value,
+            (
+                FunType("add".to_string(), vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]),
+                vec![
+                    VarType("a".to_string(), MirandaType::Int),
+                    VarType("b".to_string(), MirandaType::Int)
+                ],
+                vec![
+                    vec![
+                        MirandaExpr::MirandaInt(15),
+                        MirandaExpr::MirandaIf("a>b".to_string())
+                    ],
+                    vec![
+                        MirandaExpr::MirandaInt(16),
+                        MirandaExpr::MirandaIf("b>a".to_string())
+                    ]
+                ]
+            )
+        )
     }
 }
