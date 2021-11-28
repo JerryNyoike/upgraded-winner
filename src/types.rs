@@ -1,7 +1,7 @@
 use crate::type_checker::*;
 
 // Supported types for this Miranda
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MirandaExpr {
     MirandaBoolean(bool),
     MirandaInt(i32),
@@ -15,13 +15,13 @@ pub enum MirandaExpr {
     MirandaIf(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MirandaFunc {
     UserDefined(UserFunc),
     CoreFunc,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BuiltIn {
     Plus,
     Minus,
@@ -31,7 +31,7 @@ pub enum BuiltIn {
     Mod,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Keyword {
     Where,
     If,
@@ -39,7 +39,7 @@ pub enum Keyword {
     Type,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct UserFunc {
     frame_id: u32,
 }
