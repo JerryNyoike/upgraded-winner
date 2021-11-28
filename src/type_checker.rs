@@ -30,7 +30,7 @@ pub type Ident = String;
 
 // x :: char
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct VarType(pub Ident, pub MirandaType);
 
 impl VarType {
@@ -40,7 +40,7 @@ impl VarType {
 }
 
 // add :: int -> int -> int
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct FunType(pub Ident, pub Vec<MirandaType>);
 
 impl FunType {
@@ -77,7 +77,7 @@ pub fn variable_lookup(vars: &VarTable, identifier: Ident) -> Option<VarType> {
     return None;
 }
 
-mod tests{
+mod tests {
     use super::*;
 
     #[test]
