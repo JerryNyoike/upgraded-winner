@@ -16,6 +16,7 @@ use std::collections::HashMap;
 
 use crate::type_checker::FunType;
 use crate::type_checker::MirandaType;
+use crate::type_checker::VarType;
 use crate::types::*;
 
 fn parens(input: &str) -> IResult<&str, &str> {
@@ -317,7 +318,6 @@ fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseEr
 
     let (rest_input, _) = match parse_param_types(rest) {
         Ok((r, types)) => {
-            println!("{:?}", types);
             for typ in types.iter() {
                 param_types.push(typ.clone())
             }
@@ -330,82 +330,76 @@ fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseEr
 }
 
 pub fn parse_function_guard(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
-    let (rest, expr) = match(terminated(parse_integer ,tag(",")))(input) {
+    let (rest, expr) = match preceded(multispace0, terminated(parse_integer, tag(",")))(input) {
         Ok((r, matched)) => match parse_if(r) {
             Ok((r_inp, found)) => (r_inp, vec![matched, found]),
-            Err(e) => return Err(e)
-        }
-        Err(e) => return Err(e)
+            Err(e) => return Err(e),
+        },
+        Err(e) => return Err(e),
     };
 
     Ok((rest, expr))
 }
 
-// fn parse_function_definition(
-//     input: &str,
-// ) -> IResult<
-//     &str,
-//     (
-//         FunType,
-//         Vec<MirandaExpr>,
-//         HashMap<&str, &str>,
-//         HashMap<&str, &str>,
-//     ),
-//     VerboseError<&str>,
-// > {
-//     // add a b :: int -> int -> int
-//     // add a b = a + b, if a > b
-//     //         = b + a, if b > a
-//     //         where
-//     //         x = a * a
-//     let ((rest, fun_identifier)) = match parse_identifier(input) {
-//         Ok((r, iden)) => match iden {
-//             MirandaExpr::MirandaIdentifier(name) => (r, name),
-//             _ => panic!("Not a Miranda identifier"),
-//         },
-//         Err(e) => return Err(e),
-//     };
+pub fn parse_function_definition(
+    input: &str,
+) -> IResult<&str, (FunType, Vec<VarType>, Vec<Vec<MirandaExpr>>), VerboseError<&str>> {
+    // add a b :: int -> int -> int
+    // add a b = a + b, if a > b
+    //         = b + a, if b > a
+    //         where
+    //         x = a * a
+    let (rest, fun_identifier) = match parse_identifier(input) {
+        Ok((r, iden)) => match iden {
+            MirandaExpr::MirandaIdentifier(name) => (r, name),
+            _ => panic!("Not a Miranda identifier"),
+        },
+        Err(e) => return Err(e),
+    };
 
-//     let ((fun_type_def, param_identifiers)) =
-//         match separated_list1(multispace0, parse_identifier)(rest) {
-//             Ok((r, idens)) => (r, idens),
-//             Err(e) => return Err(e),
-//         };
+    let (function_def, param_types) = match parse_function_type(rest) {
+        Ok((r, p_types)) => (r, p_types),
+        Err(e) => return Err(e),
+    };
 
-//     let (function_def, param_types) = match parse_function_type(fun_type_def) {
-//         Ok((r, p_types)) => (r, p_types),
-//         Err(e) => return Err(e),
-//     };
+    let (fun, param_identifiers) =
+        match preceded(multispace0, separated_list0(multispace1, parse_identifier))(function_def) {
+            Ok((r, idens)) => (r, idens),
+            Err(e) => return Err(e),
+        };
 
-//     let fun_type = FunType(fun_identifier, param_types);
+    println!("Idens {:?}", param_identifiers);
 
-//     let function_body =
-//         match terminated(separated_list1(multispace0, parse_identifier), tag("="))(function_def) {
-//             Ok((r, _)) => r,
-//             Err(e) => return Err(e),
-//         };
-//     //
-//     //terminated(alt((parse_integer, parse_float)), multispace1),
-//     let (rest_input, fun_exprs) = match peek(separated_list1(
-//         alt((tag("="), tag("\n"))),
-//         parse_function_guard,
-//     ))(function_body)
-//     {
-//         Ok((r, matched)) => {
-//             if matched.empty() {
-//             } else {
-//                 (r, matched)
-//             }
-//         }
-//         Err(e) => {
-//             //attempt to match single expr
-//             match separated_list1(tag("\n"), alt((parse_integer, parse_float)))(function_def) {
-//                 Ok((r, matched)) => (r, matched),
-//                 Err(e) => return Err(e),
-//             }
-//         }
-//     };
-// }
+    let fun_type = FunType(fun_identifier.clone(), param_types.clone());
+
+    let mut var_identifier_with_types = vec![];
+    for (iden, typ) in param_identifiers
+        .clone()
+        .iter()
+        .zip(param_types.clone().iter())
+    {
+        match iden {
+            MirandaExpr::MirandaIdentifier(id) => {
+                if id.to_string() == fun_identifier.clone() {
+                    continue;
+                }
+                var_identifier_with_types.push(VarType(id.clone(), typ.clone()))
+            }
+            _ => panic!("Invalid identifier!"),
+        }
+    }
+
+    let (rest, function_body) = match preceded(
+        multispace1,
+        preceded(tag("="), separated_list1(tag("="), parse_function_guard)),
+    )(fun)
+    {
+        Ok((r, matched)) => (r, matched),
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest, (fun_type, var_identifier_with_types, function_body)))
+}
 
 fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let (input, value) = match float(input) {
@@ -591,6 +585,12 @@ mod tests {
             Err(_) => panic!("Could not parse identifier"),
         };
 
+        let val2 =
+            match separated_list0(multispace1, parse_identifier)("a b c :: int -> int -> int") {
+                Ok((_, matched)) => matched,
+                _ => panic!("Failed"),
+            };
+
         assert_eq!(value, "hello123_world".to_string());
 
         let value = match parse_identifier("hello123_world'") {
@@ -602,6 +602,15 @@ mod tests {
         };
 
         assert_eq!(value, "hello123_world'".to_string());
+
+        assert_eq!(
+            val2,
+            [
+                MirandaIdentifier("a".to_string()),
+                MirandaIdentifier("b".to_string()),
+                MirandaIdentifier("c".to_string())
+            ]
+        );
     }
 
     #[test]
@@ -756,7 +765,7 @@ mod tests {
 
     #[test]
     fn parse_param_types_test() {
-        let val = match parse_param_types(" -> int -> [int]") {
+        let val = match parse_param_types(" -> int -> [int] \n") {
             Ok((_, matched)) => matched,
             Err(e) => panic!("Failed {}", e),
         };
@@ -774,9 +783,46 @@ mod tests {
     fn parse_function_guard_test() {
         let value = match parse_function_guard("15, if a > b") {
             Ok((_, matched)) => matched,
-            Err(e) => panic!("Failed to parse: {}", e)
+            Err(e) => panic!("Failed to parse: {}", e),
         };
 
-        assert_eq!(value, vec![MirandaExpr::MirandaInt(15), MirandaExpr::MirandaIf("a > b".to_string())])
+        assert_eq!(
+            value,
+            vec![
+                MirandaExpr::MirandaInt(15),
+                MirandaExpr::MirandaIf("a > b".to_string())
+            ]
+        )
+    }
+
+    #[test]
+    fn parse_function_definition_test() {
+        let inp = "add :: int -> int -> int \n add a b = 15, if a>b \n 16, if b>a";
+
+        let value = match parse_function_definition(inp) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        // assert_eq!(
+        //     value,
+        //     (
+        //         FunType("add".to_string(), vec![MirandaType::Int, MirandaType::Int]),
+        //         vec![
+        //             VarType("a".to_string(), MirandaType::Int),
+        //             VarType("b".to_string(), MirandaType::Int)
+        //         ],
+        //         vec![
+        //             vec![
+        //                 MirandaExpr::MirandaInt(15),
+        //                 MirandaExpr::MirandaIf("a>b".to_string())
+        //             ],
+        //             vec![
+        //                 MirandaExpr::MirandaInt(16),
+        //                 MirandaExpr::MirandaIf("b>a".to_string())
+        //             ]
+        //         ]
+        //     )
+        // )
     }
 }
