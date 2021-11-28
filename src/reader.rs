@@ -22,7 +22,7 @@ fn parens(input: &str) -> IResult<&str, &str> {
     delimited(char('('), is_not(")"), char(')'))(input)
 }
 
-fn parse_integer(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+pub fn parse_integer(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let (rest_input, matched) = match i32(input) {
         Ok(x) => x,
         Err(e) => return Err(e),
@@ -96,7 +96,10 @@ fn parse_if(_input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     // an if is preceded by a comma and ended by an empty string or a newline character which shows
     // we have moved to the next guard or end of function definition
     let bool_combinator = preceded(multispace1, alt((is_not("\n"), is_not("\r"))));
-    let if_combinator = delimited(tag("if"), bool_combinator, alt((tag("\n"), tag(""))));
+    let if_combinator = preceded(
+        multispace0,
+        delimited(tag("if"), bool_combinator, alt((tag("\n"), tag("")))),
+    );
 
     let (input, if_stmt, cond) = match parse_keyword(_input.trim()) {
         Ok((_, if_expr)) => {
@@ -197,6 +200,7 @@ fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str
 }
 
 fn parse_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&str>> {
+    // var :: bool
     match alt((
         tag("bool"),
         tag("int"),
@@ -298,6 +302,9 @@ fn parse_param_types(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseErro
 }
 
 fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
+    // add :: int -> int -> int
+    // add a b = a + b, if a > b
+    //         = b + a, if b > a
     let mut param_types = vec![];
     // a function's type takes the pattern add a b :: int -> int -> int
     let (rest, _) = match parse_variable_type(input) {
@@ -322,14 +329,16 @@ fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseEr
     Ok((rest_input, param_types))
 }
 
-fn parse_function_guard(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
-    let (rest, matched) =
-        match separated_list0(tag(","), alt((parse_if, parse_string_literal)))(input) {
-            Ok((rest, matched)) => (rest, matched),
-            Err(e) => return Err(e),
-        };
+pub fn parse_function_guard(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
+    let (rest, expr) = match(terminated(parse_integer ,tag(",")))(input) {
+        Ok((r, matched)) => match parse_if(r) {
+            Ok((r_inp, found)) => (r_inp, vec![matched, found]),
+            Err(e) => return Err(e)
+        }
+        Err(e) => return Err(e)
+    };
 
-    Ok((rest, matched))
+    Ok((rest, expr))
 }
 
 // fn parse_function_definition(
@@ -641,7 +650,7 @@ mod tests {
 
     #[test]
     fn parse_if_test() {
-        let input = "if a>b";
+        let input = " if a>b";
         let val = match parse_if(input) {
             Ok((_, matched)) => matched,
             Err(e) => panic!("Failed to parse if: {}", e),
@@ -759,5 +768,15 @@ mod tests {
                 MirandaType::List(Box::new(MirandaType::Int))
             ]
         )
+    }
+
+    #[test]
+    fn parse_function_guard_test() {
+        let value = match parse_function_guard("15, if a > b") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e)
+        };
+
+        assert_eq!(value, vec![MirandaExpr::MirandaInt(15), MirandaExpr::MirandaIf("a > b".to_string())])
     }
 }
