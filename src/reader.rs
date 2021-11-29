@@ -368,8 +368,6 @@ pub fn parse_function_definition(
             Err(e) => return Err(e),
         };
 
-    println!("Idens {:?}", param_identifiers);
-
     let fun_type = FunType(fun_identifier.clone(), param_types.clone());
 
     let mut var_identifier_with_types = vec![];
@@ -392,6 +390,64 @@ pub fn parse_function_definition(
     let (rest, function_body) = match preceded(
         multispace1,
         preceded(tag("="), separated_list1(tag("="), parse_function_guard)),
+    )(fun)
+    {
+        Ok((r, matched)) => (r, matched),
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest, (fun_type, var_identifier_with_types, function_body)))
+}
+
+fn parse_function_without_guard(
+    input: &str,
+) -> IResult<&str, (FunType, Vec<VarType>, MirandaExpr), VerboseError<&str>> {
+    // add a b :: int -> int -> int
+    // add a b = a + b, if a > b
+    //         = b + a, if b > a
+    //         where
+    //         x = a * a
+    let (rest, fun_identifier) = match parse_identifier(input) {
+        Ok((r, iden)) => match iden {
+            MirandaExpr::MirandaIdentifier(name) => (r, name),
+            _ => panic!("Not a Miranda identifier"),
+        },
+        Err(e) => return Err(e),
+    };
+
+    let (function_def, param_types) = match parse_function_type(rest) {
+        Ok((r, p_types)) => (r, p_types),
+        Err(e) => return Err(e),
+    };
+
+    let (fun, param_identifiers) =
+        match preceded(multispace0, separated_list0(multispace1, parse_identifier))(function_def) {
+            Ok((r, idens)) => (r, idens),
+            Err(e) => return Err(e),
+        };
+
+    let fun_type = FunType(fun_identifier.clone(), param_types.clone());
+
+    let mut var_identifier_with_types = vec![];
+    for (iden, typ) in param_identifiers
+        .clone()
+        .iter()
+        .zip(param_types.clone().iter())
+    {
+        match iden {
+            MirandaExpr::MirandaIdentifier(id) => {
+                if id.to_string() == fun_identifier.clone() {
+                    continue;
+                }
+                var_identifier_with_types.push(VarType(id.clone(), typ.clone()))
+            }
+            _ => panic!("Invalid identifier!"),
+        }
+    }
+
+    let (rest, function_body) = match preceded(
+        multispace1,
+        preceded(tag("="), delimited(multispace0, parse_integer, multispace0)),
     )(fun)
     {
         Ok((r, matched)) => (r, matched),
@@ -807,7 +863,10 @@ mod tests {
         assert_eq!(
             value,
             (
-                FunType("add".to_string(), vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]),
+                FunType(
+                    "add".to_string(),
+                    vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
+                ),
                 vec![
                     VarType("a".to_string(), MirandaType::Int),
                     VarType("b".to_string(), MirandaType::Int)
@@ -823,6 +882,28 @@ mod tests {
                     ]
                 ]
             )
-        )
+        );
+
+        let inp2 = "add :: int -> int -> int \n add a b = 25";
+
+        let value2 = match parse_function_without_guard(inp2) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        assert_eq!(
+            value2,
+            (
+                FunType(
+                    "add".to_string(),
+                    vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
+                ),
+                vec![
+                    VarType("a".to_string(), MirandaType::Int),
+                    VarType("b".to_string(), MirandaType::Int)
+                ],
+                MirandaExpr::MirandaInt(25)
+            )
+        );
     }
 }
