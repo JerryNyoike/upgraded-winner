@@ -245,13 +245,14 @@ fn parse_variable_type(input: &str) -> IResult<&str, MirandaType, VerboseError<&
     Ok((input, matched))
 }
 
-fn parse_variable_definition(
-    input: &str,
-) -> IResult<&str, (MirandaExpr, MirandaType, MirandaExpr), VerboseError<&str>> {
+fn parse_variable_definition(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     // variable definitions involve a tpye declaration and the actual initialization
     // get identifier name
     let (r_inp, identifier) = match parse_identifier(input) {
-        Ok(x) => x,
+        Ok(x) => match x {
+            (r, MirandaExpr::MirandaIdentifier(iden)) => (r, iden),
+            _ => panic!("Error parsing!"),
+        },
         Err(e) => return Err(e),
     };
 
@@ -288,7 +289,10 @@ fn parse_variable_definition(
         Err(e) => return Err(e),
     };
 
-    Ok((rest_input, (identifier, var_type, value)))
+    Ok((
+        rest_input,
+        MirandaExpr::MirandaBinding(VarType(identifier, var_type), Box::new(value)),
+    ))
 }
 
 fn parse_param_types(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseError<&str>> {
@@ -341,9 +345,7 @@ pub fn parse_function_guard(input: &str) -> IResult<&str, Vec<MirandaExpr>, Verb
     Ok((rest, expr))
 }
 
-pub fn parse_function_definition(
-    input: &str,
-) -> IResult<&str, (FunType, Vec<VarType>, Vec<Vec<MirandaExpr>>), VerboseError<&str>> {
+pub fn parse_function_definition(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     // add a b :: int -> int -> int
     // add a b = a + b, if a > b
     //         = b + a, if b > a
@@ -396,12 +398,13 @@ pub fn parse_function_definition(
         Err(e) => return Err(e),
     };
 
-    Ok((rest, (fun_type, var_identifier_with_types, function_body)))
+    Ok((
+        rest,
+        MirandaExpr::MirandaFunction(fun_type, var_identifier_with_types, function_body),
+    ))
 }
 
-fn parse_function_without_guard(
-    input: &str,
-) -> IResult<&str, (FunType, Vec<VarType>, MirandaExpr), VerboseError<&str>> {
+fn parse_function_without_guard(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     // add a b :: int -> int -> int
     // add a b = a + b, if a > b
     //         = b + a, if b > a
@@ -454,7 +457,14 @@ fn parse_function_without_guard(
         Err(e) => return Err(e),
     };
 
-    Ok((rest, (fun_type, var_identifier_with_types, function_body)))
+    Ok((
+        rest,
+        MirandaExpr::MirandaFunction(
+            fun_type,
+            var_identifier_with_types,
+            vec![vec![function_body]],
+        ),
+    ))
 }
 
 fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
@@ -794,10 +804,9 @@ mod tests {
 
         assert_eq!(
             val,
-            (
-                MirandaIdentifier("jerry".to_string()),
-                MirandaType::Int,
-                MirandaInt(1)
+            MirandaExpr::MirandaBinding(
+                VarType("jerry".to_string(), MirandaType::Int),
+                Box::new(MirandaInt(1))
             )
         )
     }
@@ -862,7 +871,7 @@ mod tests {
 
         assert_eq!(
             value,
-            (
+            MirandaExpr::MirandaFunction(
                 FunType(
                     "add".to_string(),
                     vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
@@ -893,7 +902,7 @@ mod tests {
 
         assert_eq!(
             value2,
-            (
+            MirandaExpr::MirandaFunction(
                 FunType(
                     "add".to_string(),
                     vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
@@ -902,7 +911,7 @@ mod tests {
                     VarType("a".to_string(), MirandaType::Int),
                     VarType("b".to_string(), MirandaType::Int)
                 ],
-                MirandaExpr::MirandaInt(25)
+                vec![vec![MirandaExpr::MirandaInt(25)]]
             )
         );
     }
