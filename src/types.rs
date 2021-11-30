@@ -102,67 +102,11 @@ pub struct UserFunc {
     frame_id: u32,
 }
 
-pub struct Env {
-    funs_table: FunTable,
-    vars_table: VarTable,
-}
-
-impl Env {
-    pub fn function_lookup(&self, identifier: &Ident) -> Option<FunType> {
-        if let Some(x) = self.funs_table.get(identifier) {
-            return Some((*x).clone());
-        }
-        return None;
-    }
-
-    pub fn variable_lookup(&self, identifier: &Ident) -> Option<VarType> {
-        if let Some(x) = self.vars_table.get(identifier) {
-            return Some((*x).clone());
-        }
-        return None;
-    }
-
-    // insert a variable to table
-    fn extend_var(&mut self, id: Ident, t: MirandaType) {
-        if let Some(v) = self.variable_lookup(&id) {
-            println!("Variable {} {} already defined", v.0, v.1.to_string());
-            return;
-        }
-        self.vars_table.insert(id.clone(), VarType::new(id, t));
-    }
-
-    // insert a function to the table
-    fn extend_fn(&mut self, id: Ident, t: Vec<MirandaType>) {
-        if let Some(f) = self.function_lookup(&id) {
-            println!("Function {} is already defined", f);
-            return;
-        }
-        self.funs_table.insert(id.clone(), FunType::new(id, t));
-    }
-
-    // returns false if the name is not found in the symbol table
-    // true otherwise
-    fn name_lookup(&self, id: Ident) -> bool {
-        if let None = self.variable_lookup(&id) {
-            if let None = self.function_lookup(&id) {
-                return false;
-            }
-        }
-        true
-    }
-
-    // checks if variable identifier has specified type
-    fn check_var(&self, id: Ident, t: MirandaType) -> bool {
-        // if let Some(v) = variable_lookup()
-        false
-    }
-}
-
 mod tests {
     use super::*;
 
     #[test]
-    fn type_string() {
+    fn test_type_string() {
         let value: MirandaType = MirandaType::List(Box::new(MirandaType::Int));
         assert_eq!(value.to_string(), "list int")
     }
