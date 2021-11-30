@@ -14,9 +14,6 @@ use nom::{
 
 use std::collections::HashMap;
 
-use crate::type_checker::FunType;
-use crate::type_checker::MirandaType;
-use crate::type_checker::VarType;
 use crate::types::*;
 
 fn parens(input: &str) -> IResult<&str, &str> {
@@ -479,9 +476,7 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::type_checker::MirandaType;
-    use crate::types::MirandaExpr::*;
-    use std::string::String;
+    use crate::types::{BuiltIn, Keyword, MirandaExpr, MirandaType};
 
     #[test]
     fn parens_test() {
@@ -497,7 +492,11 @@ mod tests {
 
         assert_eq!(
             val,
-            MirandaList(vec![MirandaInt(1), MirandaInt(2), MirandaInt(3)])
+            MirandaExpr::MirandaList(vec![
+                MirandaExpr::MirandaInt(1),
+                MirandaExpr::MirandaInt(2),
+                MirandaExpr::MirandaInt(3)
+            ])
         )
     }
 
@@ -505,7 +504,7 @@ mod tests {
     fn boolean_test() {
         let value = match parse_bool("True") {
             Ok((_, mirand)) => match mirand {
-                MirandaBoolean(x) => x,
+                MirandaExpr::MirandaBoolean(x) => x,
                 _ => false,
             },
             Err(_) => false,
@@ -515,7 +514,7 @@ mod tests {
 
         let value = match parse_bool("False") {
             Ok((_, mirand)) => match mirand {
-                MirandaBoolean(x) => x,
+                MirandaExpr::MirandaBoolean(x) => x,
                 _ => true,
             },
             Err(_) => true,
@@ -533,7 +532,7 @@ mod tests {
     fn num_parse_test() {
         let value = match parse_num("123") {
             Ok((_, mirand)) => match mirand {
-                MirandaInt(x) => x,
+                MirandaExpr::MirandaInt(x) => x,
                 _ => panic!("this test has failed...like you"),
             },
             Err(_) => panic!("what did you expect"),
@@ -542,7 +541,7 @@ mod tests {
         assert_eq!(value, 123);
         let value = match parse_num("-123") {
             Ok((_, mirand)) => match mirand {
-                MirandaInt(x) => x,
+                MirandaExpr::MirandaInt(x) => x,
                 _ => panic!("this test has failed...like you"),
             },
             Err(_) => panic!("what did you expect"),
@@ -609,7 +608,7 @@ mod tests {
     fn char_literal_test() {
         let value = match parse_char_literal("'c'") {
             Ok((_, mirand)) => match mirand {
-                MirandaChar(x) => x,
+                MirandaExpr::MirandaChar(x) => x,
                 _ => panic!("this test has failed...like you"),
             },
             Err(_) => panic!("what did you expect"),
@@ -622,7 +621,7 @@ mod tests {
     fn str_literal_test() {
         let value = match parse_string_literal("\"This is a string\"") {
             Ok((_, mirand)) => match mirand {
-                MirandaString(x) => x,
+                MirandaExpr::MirandaString(x) => x,
                 _ => panic!("this test has failed...like you"),
             },
             Err(_) => panic!("what did you expect"),
@@ -645,7 +644,7 @@ mod tests {
     fn parse_identifier_test() {
         let value = match parse_identifier("hello123_world") {
             Ok((_, matched)) => match matched {
-                MirandaIdentifier(x) => x,
+                MirandaExpr::MirandaIdentifier(x) => x,
                 _ => panic!("Error"),
             },
             Err(_) => panic!("Could not parse identifier"),
@@ -661,7 +660,7 @@ mod tests {
 
         let value = match parse_identifier("hello123_world'") {
             Ok((_, matched)) => match matched {
-                MirandaIdentifier(x) => x,
+                MirandaExpr::MirandaIdentifier(x) => x,
                 _ => panic!("Error"),
             },
             Err(_) => panic!("Could not parse identifier"),
@@ -672,9 +671,9 @@ mod tests {
         assert_eq!(
             val2,
             [
-                MirandaIdentifier("a".to_string()),
-                MirandaIdentifier("b".to_string()),
-                MirandaIdentifier("c".to_string())
+                MirandaExpr::MirandaIdentifier("a".to_string()),
+                MirandaExpr::MirandaIdentifier("b".to_string()),
+                MirandaExpr::MirandaIdentifier("c".to_string())
             ]
         );
     }
@@ -683,7 +682,7 @@ mod tests {
     fn parse_integer_test() {
         let val = match parse_integer("12345") {
             Ok((_, matched)) => match matched {
-                MirandaInt(n) => n,
+                MirandaExpr::MirandaInt(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
@@ -693,7 +692,7 @@ mod tests {
 
         let val = match parse_integer("-12345") {
             Ok((_, matched)) => match matched {
-                MirandaInt(n) => n,
+                MirandaExpr::MirandaInt(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
@@ -710,7 +709,7 @@ mod tests {
         for kw in keywords {
             let _ = match parse_keyword(kw) {
                 Ok((_, matched)) => match matched {
-                    MirandaKeyword(x) => matched_keywords.push(x),
+                    MirandaExpr::MirandaKeyword(x) => matched_keywords.push(x),
                     _ => panic!("test failed"),
                 },
                 Err(_) => panic!("test failed"),
@@ -736,15 +735,15 @@ mod tests {
             Ok((_, matched)) => matched,
             Err(e) => panic!("Failed to parse if: {}", e),
         };
-        assert_eq!(val, (MirandaIf("a>b".to_string())));
-        assert_eq!(val2, (MirandaIf("a>b".to_string())));
+        assert_eq!(val, (MirandaExpr::MirandaIf("a>b".to_string())));
+        assert_eq!(val2, (MirandaExpr::MirandaIf("a>b".to_string())));
     }
 
     #[test]
     fn parse_float_test() {
         let val = match parse_float("11e-1") {
             Ok((_, matched)) => match matched {
-                MirandaFloat(n) => n,
+                MirandaExpr::MirandaFloat(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
@@ -754,7 +753,7 @@ mod tests {
 
         let val = match parse_float(".42") {
             Ok((_, matched)) => match matched {
-                MirandaFloat(n) => n,
+                MirandaExpr::MirandaFloat(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
@@ -764,7 +763,7 @@ mod tests {
 
         let val = match parse_float("-11e-1") {
             Ok((_, matched)) => match matched {
-                MirandaFloat(n) => n,
+                MirandaExpr::MirandaFloat(n) => n,
                 _ => panic!("Not a number"),
             },
             Err(_) => panic!("Failed"),
@@ -806,7 +805,7 @@ mod tests {
             val,
             MirandaExpr::MirandaBinding(
                 VarType("jerry".to_string(), MirandaType::Int),
-                Box::new(MirandaInt(1))
+                Box::new(MirandaExpr::MirandaInt(1))
             )
         )
     }
