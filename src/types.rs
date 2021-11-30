@@ -1,7 +1,7 @@
 use crate::type_checker::*;
 
 // Supported types for this Miranda
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MirandaExpr {
     MirandaBoolean(bool),
     MirandaInt(i32),
@@ -10,17 +10,19 @@ pub enum MirandaExpr {
     MirandaString(String),
     MirandaKeyword(Keyword),
     MirandaList(Vec<MirandaExpr>),
-    MirandaFunction(MirandaFunc),
     MirandaIdentifier(String),
+    MirandaIf(String),
+    MirandaBinding(VarType, Box<MirandaExpr>),
+    MirandaFunction(FunType, Vec<VarType>, Vec<Vec<MirandaExpr>>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MirandaFunc {
     UserDefined(UserFunc),
     CoreFunc,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BuiltIn {
     Plus,
     Minus,
@@ -30,7 +32,7 @@ pub enum BuiltIn {
     Mod,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Keyword {
     Where,
     If,
@@ -38,7 +40,7 @@ pub enum Keyword {
     Type,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct UserFunc {
     frame_id: u32,
 }
@@ -68,9 +70,7 @@ impl Env {
         self.funs_table.insert(id.clone(), FunType::new(id, t));
     }
 
-    fn check(&self, t: MirandaType){}
+    fn check(&self, t: MirandaType) {}
 }
 
-
-mod tests {
-}
+mod tests {}
