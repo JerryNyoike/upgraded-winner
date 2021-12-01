@@ -27,6 +27,8 @@ impl ToString for MirandaType {
     }
 }
 
+pub trait Bindings {}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct VarType(pub Ident, pub MirandaType);
 
@@ -35,6 +37,8 @@ impl VarType {
         Self(id, t)
     }
 }
+
+impl Bindings for VarType{}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct FunType(pub Ident, pub Vec<MirandaType>);
@@ -54,8 +58,10 @@ impl fmt::Display for FunType {
     }
 }
 
-pub type FunTable = HashMap<Ident, FunType>;
+impl Bindings for FunType{}
+
 pub type VarTable = HashMap<Ident, VarType>;
+
 
 // Supported types for this Miranda
 #[derive(Debug, PartialEq, Clone)]
