@@ -331,7 +331,7 @@ fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseEr
 }
 
 pub fn parse_function_guard(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
-    let (rest, expr) = match preceded(multispace0, terminated(parse_integer, tag(",")))(input) {
+    let (rest, expr) = match preceded(multispace0, terminated(parse_expr, tag(",")))(input) {
         Ok((r, matched)) => match parse_if(r) {
             Ok((r_inp, found)) => (r_inp, vec![matched, found]),
             Err(e) => return Err(e),
@@ -447,7 +447,7 @@ fn parse_function_without_guard(input: &str) -> IResult<&str, MirandaExpr, Verbo
 
     let (rest, function_body) = match preceded(
         multispace1,
-        preceded(tag("="), delimited(multispace0, parse_integer, multispace0)),
+        preceded(tag("="), delimited(multispace0, parse_expr, multispace0)),
     )(fun)
     {
         Ok((r, matched)) => (r, matched),
@@ -471,6 +471,27 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     };
 
     Ok((input, MirandaExpr::MirandaFloat(value)))
+}
+
+fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (rest_input, matched) = match alt((
+        parse_variable_definition,
+        parse_function_definition,
+        parse_function_without_guard,
+        parse_bool,
+        parse_char_literal,
+        parse_string_literal,
+        parse_integer,
+        parse_float,
+        list,
+        parse_identifier,
+    ))(input)
+    {
+        Ok((r, m)) => (r, m),
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest_input, matched))
 }
 
 #[cfg(test)]
@@ -901,6 +922,40 @@ mod tests {
 
         assert_eq!(
             value2,
+            MirandaExpr::MirandaFunction(
+                FunType(
+                    "add".to_string(),
+                    vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
+                ),
+                vec![
+                    VarType("a".to_string(), MirandaType::Int),
+                    VarType("b".to_string(), MirandaType::Int)
+                ],
+                vec![vec![MirandaExpr::MirandaInt(25)]]
+            )
+        );
+    }
+
+    #[test]
+    fn parse_expr_test() {
+        let inp = "inp";
+
+        let inp2 = "add :: int -> int -> int \n add a b = 25";
+
+        let val = match parse_expr(inp) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        let val2 = match parse_expr(inp2) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        assert_eq!(val, MirandaExpr::MirandaIdentifier("inp".to_string()));
+
+        assert_eq!(
+            val2,
             MirandaExpr::MirandaFunction(
                 FunType(
                     "add".to_string(),
