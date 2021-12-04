@@ -74,17 +74,19 @@ fn parse_num(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     ))(input)
 }
 
-fn parse_builtin_op(input: &str) -> IResult<&str, BuiltIn, VerboseError<&str>> {
-    let (input, t) = one_of("+-*/=%")(input)?;
+fn parse_builtin_op(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (input, t) = one_of("+-*/=%><")(input)?;
     Ok((
         input,
         match t {
-            '+' => BuiltIn::Plus,
-            '-' => BuiltIn::Minus,
-            '*' => BuiltIn::Times,
-            '/' => BuiltIn::Divide,
-            '=' => BuiltIn::Equal,
-            '%' => BuiltIn::Mod,
+            '+' => MirandaExpr::MirandaBuiltIn(BuiltIn::Plus),
+            '-' => MirandaExpr::MirandaBuiltIn(BuiltIn::Minus),
+            '*' => MirandaExpr::MirandaBuiltIn(BuiltIn::Times),
+            '/' => MirandaExpr::MirandaBuiltIn(BuiltIn::Divide),
+            '=' => MirandaExpr::MirandaBuiltIn(BuiltIn::Equal),
+            '%' => MirandaExpr::MirandaBuiltIn(BuiltIn::Mod),
+            '>' => MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
+            '<' => MirandaExpr::MirandaBuiltIn(BuiltIn::LessThan),
             _ => unreachable!(),
         },
     ))
@@ -93,20 +95,22 @@ fn parse_builtin_op(input: &str) -> IResult<&str, BuiltIn, VerboseError<&str>> {
 fn parse_if(_input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     // an if is preceded by a comma and ended by an empty string or a newline character which shows
     // we have moved to the next guard or end of function definition
-    let bool_combinator = preceded(multispace1, alt((is_not("\n"), is_not("\r"))));
     let if_combinator = preceded(
         multispace0,
-        delimited(tag("if"), bool_combinator, multispace0),
+        delimited(
+            tag("if"),
+            preceded(multispace0, parse_builtin_expr),
+            multispace0,
+        ),
     );
 
-    let (input, if_stmt, cond) = match parse_keyword(_input.trim()) {
-        Ok((_, if_expr)) => {
+    let (input, cond) = match parse_keyword(_input.trim()) {
+        Ok((_, _)) => {
             // if keyword matched now get the boolean expression
-            // TODO replace alt parser with a parser for a boolean expression
             match preceded(multispace0, if_combinator)(_input.trim()) {
                 Ok((rest_input, matched)) => {
                     // matched boolean expression
-                    (rest_input, if_expr, matched)
+                    (rest_input, matched)
                 }
                 Err(e) => return Err(e),
             }
@@ -114,7 +118,7 @@ fn parse_if(_input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
         Err(e) => return Err(e),
     };
 
-    Ok((input, MirandaExpr::MirandaIf(cond.to_string())))
+    Ok((input, MirandaExpr::MirandaIf(Box::new(cond))))
 }
 
 fn parse_char_literal(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
@@ -194,6 +198,37 @@ fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str
     Ok((
         rest_input,
         MirandaExpr::MirandaIdentifier(matched.to_string()),
+    ))
+}
+
+fn parse_builtin_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (rest, first_val) = match preceded(
+        multispace0,
+        alt((parse_integer, parse_float, parse_identifier)),
+    )(input)
+    {
+        Ok((r, found)) => (r, found),
+        Err(e) => return Err(e),
+    };
+
+    let (rest, builtin) =
+        match alt((preceded(multispace0, parse_builtin_op), parse_builtin_op))(rest) {
+            Ok((r, found)) => (r, found),
+            Err(e) => return Err(e),
+        };
+
+    let (rest, second_val) = match preceded(
+        multispace0,
+        alt((parse_integer, parse_float, parse_identifier)),
+    )(rest)
+    {
+        Ok((r, found)) => (r, found),
+        Err(e) => return Err(e),
+    };
+
+    Ok((
+        rest,
+        MirandaExpr::MirandaBuiltInExpr(vec![first_val, builtin, second_val]),
     ))
 }
 
@@ -331,7 +366,7 @@ fn parse_function_type(input: &str) -> IResult<&str, Vec<MirandaType>, VerboseEr
 }
 
 pub fn parse_function_guard(input: &str) -> IResult<&str, Vec<MirandaExpr>, VerboseError<&str>> {
-    let (rest, expr) = match preceded(multispace0, terminated(parse_integer, tag(",")))(input) {
+    let (rest, expr) = match preceded(multispace0, terminated(parse_expr, tag(",")))(input) {
         Ok((r, matched)) => match parse_if(r) {
             Ok((r_inp, found)) => (r_inp, vec![matched, found]),
             Err(e) => return Err(e),
@@ -447,7 +482,7 @@ fn parse_function_without_guard(input: &str) -> IResult<&str, MirandaExpr, Verbo
 
     let (rest, function_body) = match preceded(
         multispace1,
-        preceded(tag("="), delimited(multispace0, parse_integer, multispace0)),
+        preceded(tag("="), delimited(multispace0, parse_expr, multispace0)),
     )(fun)
     {
         Ok((r, matched)) => (r, matched),
@@ -471,6 +506,29 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     };
 
     Ok((input, MirandaExpr::MirandaFloat(value)))
+}
+
+fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (rest_input, matched) = match alt((
+        parse_variable_definition,
+        parse_function_definition,
+        parse_function_without_guard,
+        parse_builtin_expr,
+        parse_bool,
+        parse_char_literal,
+        parse_string_literal,
+        parse_integer,
+        parse_float,
+        list,
+        parse_identifier,
+        parse_builtin_op,
+    ))(input)
+    {
+        Ok((r, m)) => (r, m),
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest_input, matched))
 }
 
 #[cfg(test)]
@@ -555,7 +613,7 @@ mod tests {
         let inp = "+-/*=%";
         let (inp, _) = match parse_builtin_op(inp) {
             Ok((i, b)) => match b {
-                BuiltIn::Plus => (i, b),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Plus) => (i, b),
                 _ => return Err("aren't you tired of failure".to_string()),
             },
             Err(_) => panic!("aren't you tired of failure"),
@@ -563,7 +621,7 @@ mod tests {
 
         let (inp, _) = match parse_builtin_op(inp) {
             Ok((i, b)) => match b {
-                BuiltIn::Minus => (i, b),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Minus) => (i, b),
                 _ => return Err("aren't you tired of failure".to_string()),
             },
             Err(_) => panic!("aren't you tired of failure"),
@@ -571,7 +629,7 @@ mod tests {
 
         let (inp, _) = match parse_builtin_op(inp) {
             Ok((i, b)) => match b {
-                BuiltIn::Divide => (i, b),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Divide) => (i, b),
                 _ => return Err("aren't you tired of failure".to_string()),
             },
             Err(_) => panic!("aren't you tired of failure"),
@@ -579,7 +637,7 @@ mod tests {
 
         let (inp, _) = match parse_builtin_op(inp) {
             Ok((i, b)) => match b {
-                BuiltIn::Times => (i, b),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Times) => (i, b),
                 _ => return Err("aren't you tired of failure".to_string()),
             },
             Err(_) => panic!("aren't you tired of failure"),
@@ -587,7 +645,7 @@ mod tests {
 
         let (inp, _) = match parse_builtin_op(inp) {
             Ok((i, b)) => match b {
-                BuiltIn::Equal => (i, b),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Equal) => (i, b),
                 _ => return Err("aren't you tired of failure".to_string()),
             },
             Err(_) => panic!("aren't you tired of failure"),
@@ -595,7 +653,7 @@ mod tests {
 
         let (inp, _) = match parse_builtin_op(inp) {
             Ok((i, b)) => match b {
-                BuiltIn::Mod => (i, b),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Mod) => (i, b),
                 _ => return Err("aren't you tired of failure".to_string()),
             },
             Err(_) => panic!("aren't you tired of failure"),
@@ -735,8 +793,23 @@ mod tests {
             Ok((_, matched)) => matched,
             Err(e) => panic!("Failed to parse if: {}", e),
         };
-        assert_eq!(val, (MirandaExpr::MirandaIf("a>b".to_string())));
-        assert_eq!(val2, (MirandaExpr::MirandaIf("a>b".to_string())));
+        assert_eq!(
+            val,
+            MirandaExpr::MirandaIf(Box::new(MirandaExpr::MirandaBuiltInExpr(vec![
+                MirandaExpr::MirandaIdentifier("a".to_string()),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
+                MirandaExpr::MirandaIdentifier("b".to_string())
+            ])))
+        );
+
+        assert_eq!(
+            val2,
+            MirandaExpr::MirandaIf(Box::new(MirandaExpr::MirandaBuiltInExpr(vec![
+                MirandaExpr::MirandaIdentifier("a".to_string()),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
+                MirandaExpr::MirandaIdentifier("b".to_string())
+            ])))
+        );
     }
 
     #[test]
@@ -854,7 +927,11 @@ mod tests {
             value,
             vec![
                 MirandaExpr::MirandaInt(15),
-                MirandaExpr::MirandaIf("a > b".to_string())
+                MirandaExpr::MirandaIf(Box::new(MirandaExpr::MirandaBuiltInExpr(vec![
+                    MirandaExpr::MirandaIdentifier("a".to_string()),
+                    MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
+                    MirandaExpr::MirandaIdentifier("b".to_string())
+                ])))
             ]
         )
     }
@@ -882,11 +959,19 @@ mod tests {
                 vec![
                     vec![
                         MirandaExpr::MirandaInt(15),
-                        MirandaExpr::MirandaIf("a>b".to_string())
+                        MirandaExpr::MirandaIf(Box::new(MirandaExpr::MirandaBuiltInExpr(vec![
+                            MirandaExpr::MirandaIdentifier("a".to_string()),
+                            MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
+                            MirandaExpr::MirandaIdentifier("b".to_string())
+                        ])))
                     ],
                     vec![
                         MirandaExpr::MirandaInt(16),
-                        MirandaExpr::MirandaIf("b>a".to_string())
+                        MirandaExpr::MirandaIf(Box::new(MirandaExpr::MirandaBuiltInExpr(vec![
+                            MirandaExpr::MirandaIdentifier("b".to_string()),
+                            MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
+                            MirandaExpr::MirandaIdentifier("a".to_string())
+                        ])))
                     ]
                 ]
             )
@@ -912,6 +997,71 @@ mod tests {
                 ],
                 vec![vec![MirandaExpr::MirandaInt(25)]]
             )
+        );
+    }
+
+    #[test]
+    fn parse_expr_test() {
+        let inp = "inp";
+
+        let inp2 = "add :: int -> int -> int \n add a b = 25";
+
+        let val = match parse_expr(inp) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        let val2 = match parse_expr(inp2) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        let val3 = match parse_expr("1 + 1") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        assert_eq!(val, MirandaExpr::MirandaIdentifier("inp".to_string()));
+
+        assert_eq!(
+            val2,
+            MirandaExpr::MirandaFunction(
+                FunType(
+                    "add".to_string(),
+                    vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
+                ),
+                vec![
+                    VarType("a".to_string(), MirandaType::Int),
+                    VarType("b".to_string(), MirandaType::Int)
+                ],
+                vec![vec![MirandaExpr::MirandaInt(25)]]
+            )
+        );
+
+        assert_eq!(
+            val3,
+            MirandaExpr::MirandaBuiltInExpr(vec![
+                MirandaExpr::MirandaInt(1),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Plus),
+                MirandaExpr::MirandaInt(1)
+            ])
+        );
+    }
+
+    #[test]
+    fn parse_builtin_expr_test() {
+        let val = match parse_builtin_expr("1 + 1") {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        assert_eq!(
+            val,
+            MirandaExpr::MirandaBuiltInExpr(vec![
+                MirandaExpr::MirandaInt(1),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Plus),
+                MirandaExpr::MirandaInt(1)
+            ])
         );
     }
 }

@@ -65,12 +65,14 @@ pub enum MirandaExpr {
     MirandaFloat(f32),
     MirandaChar(char),
     MirandaString(String),
+    MirandaBuiltIn(BuiltIn),
     MirandaKeyword(Keyword),
     MirandaList(Vec<MirandaExpr>),
     MirandaIdentifier(String),
-    MirandaIf(String),
+    MirandaIf(Box<MirandaExpr>),
     MirandaBinding(VarType, Box<MirandaExpr>),
     MirandaFunction(FunType, Vec<VarType>, Vec<Vec<MirandaExpr>>),
+    MirandaBuiltInExpr(Vec<MirandaExpr>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -79,7 +81,7 @@ pub enum MirandaFunc {
     CoreFunc,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BuiltIn {
     Plus,
     Minus,
@@ -87,6 +89,8 @@ pub enum BuiltIn {
     Divide,
     Equal,
     Mod,
+    GreaterThan,
+    LessThan,
 }
 
 #[derive(Debug, PartialEq, Clone)]
