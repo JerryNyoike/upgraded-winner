@@ -75,6 +75,7 @@ pub enum MirandaExpr {
     MirandaFunctionDeclaration(FunType),
     MirandaFunctionDefinition(Ident, Vec<Ident>, Vec<Vec<MirandaExpr>>),
     MirandaBuiltInExpr(Vec<MirandaExpr>),
+    MirandaFunctionApplication(Ident, Vec<MirandaExpr>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
