@@ -111,6 +111,7 @@ pub struct UserFunc {
 pub struct Env {
     funs_table: FunTable,
     vars_table: VarTable,
+    values: HashMap<Ident, Vec<MirandaExpr>>,
 }
 
 impl Env {
@@ -128,6 +129,42 @@ impl Env {
         None
     }
 
+    pub fn function_body(&self, identifier: &Ident) -> Option<Vec<MirandaExpr>> {
+        if let Some(x) = self.funs_table.get(identifier) {
+            match x {
+                FunType(id, _) => {
+                    // get the function body from the environment
+                    if let Some(fun_body) = self.values.get(id) {
+                        Some(fun_body)
+                    } else {
+                        println!("Function declared but not defined");
+                        None
+                    };
+                }
+            }
+        }
+        println!("Function {} not defined", identifier);
+        None
+    }
+
+    pub fn binding_value(&self, identifier: &Ident) -> Option<MirandaExpr> {
+        if let Some(x) = self.vars_table.get(identifier) {
+            match x {
+                VarType(id, _) => {
+                    // get the function body from the environment
+                    if let Some(var_value) = self.values.get(id) {
+                        Some(var_value)
+                    } else {
+                        println!("Variable {} declared but not defined", identifier);
+                        None
+                    };
+                }
+            }
+        }
+        println!("Variable {} not defined", identifier);
+        None
+    }
+
     // insert a variable to table
     fn extend_var(&mut self, id: Ident, t: MirandaType) {
         if let Some(v) = self.variable_lookup(&id) {
@@ -135,6 +172,20 @@ impl Env {
             return;
         }
         self.vars_table.insert(id.clone(), VarType::new(id, t));
+    }
+
+    // set the value of the variable
+    pub fn set_var_value(&mut self, id: Ident, val: MirandaExpr) {
+        if self.name_lookup(&id) {
+            self.values.insert(id, vec![val]);
+        }
+    }
+
+    // set function body
+    pub fn set_fun_value(&mut self, id: Ident, val: Vec<MirandaExpr>) {
+        if self.name_lookup(&id) {
+            self.values.insert(id, val);
+        }
     }
 
     // insert a function to the table
@@ -148,8 +199,8 @@ impl Env {
 
     // returns false if the name is not found in the symbol table
     // true otherwise
-    fn name_lookup(&self, id: Ident) -> bool {
-        if self.variable_lookup(&id).is_none() && self.function_lookup(&id).is_none() {
+    pub fn name_lookup(&self, id: &Ident) -> bool {
+        if self.variable_lookup(id).is_none() && self.function_lookup(id).is_none() {
             return false;
         }
         true
