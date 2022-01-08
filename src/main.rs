@@ -1,9 +1,9 @@
 extern crate nom;
 
+mod eval;
 mod reader;
 mod type_checker;
 mod types;
-mod eval;
 
 fn main() {
     println!("Hello, world!");
