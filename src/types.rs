@@ -78,6 +78,26 @@ pub enum MirandaExpr {
     MirandaFunctionApplication(Ident, Vec<MirandaExpr>),
 }
 
+impl fmt::Display for MirandaExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MirandaExpr::MirandaBoolean(bl) => write!(f, "{}", bl),
+            MirandaExpr::MirandaInt(num) => write!(f, "{}", num),
+            MirandaExpr::MirandaFloat(fl) => write!(f, "{}", fl),
+            MirandaExpr::MirandaChar(ch) => write!(f, "'{}'", ch),
+            MirandaExpr::MirandaString(string) => write!(f, "\"{}\"", string),
+            MirandaExpr::MirandaList(ls) => {
+                let mut ls_as_str = vec![];
+                for l in ls {
+                    ls_as_str.push(l.to_string());
+                }
+                write!(f, "{:#?}", ls_as_str)
+            }
+            _ => todo!(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum MirandaFunc {
     UserDefined(UserFunc),
@@ -116,6 +136,14 @@ pub struct Env {
 }
 
 impl Env {
+    pub fn new() -> Self {
+        Self {
+            funs_table: HashMap::new(),
+            vars_table: HashMap::new(),
+            values: HashMap::new(),
+        }
+    }
+
     pub fn function_lookup(&self, identifier: &Ident) -> Option<FunType> {
         if let Some(x) = self.funs_table.get(identifier) {
             return Some((*x).clone());
