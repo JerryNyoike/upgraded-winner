@@ -343,6 +343,14 @@ pub fn eval(expr: MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
                 _ => unreachable!(),
             }
         }
+        MirandaExpr::MirandaIf(pred) => {
+            let pred_val = eval(*pred, env);
+            if let Some(val) = pred_val {
+                Some(val)
+            } else {
+                None
+            }
+        }
         _ => panic!(),
     }
 }
@@ -390,6 +398,15 @@ mod tests {
             test_env,
         );
 
+        let if_v = eval(
+            MirandaIf(Box::new(MirandaBuiltInExpr(vec![
+                MirandaInt(1),
+                MirandaBuiltIn(BuiltIn::Equal),
+                MirandaInt(5),
+            ]))),
+            test_env,
+        );
+
         assert_eq!(
             list_val,
             Some(MirandaExpr::MirandaList(vec![
@@ -401,7 +418,7 @@ mod tests {
         assert_eq!(char_val, Some(MirandaExpr::MirandaChar('b')));
         assert_eq!(bool_val, Some(MirandaExpr::MirandaBoolean(true)));
         // assert_eq!(float_val, Some(MirandaExpr::MirandaFloat(0.98)));
-        assert_eq!(add_val, Some(MirandaExpr::MirandaInt(5)));
+        assert_eq!(add_val, Some(MirandaExpr::MirandaInt(2)));
         assert_eq!(
             append_val,
             Some(MirandaExpr::MirandaList(vec![
@@ -412,5 +429,6 @@ mod tests {
             ]))
         );
         assert_eq!(bool_v, Some(MirandaExpr::MirandaBoolean(false)));
+        assert_eq!(if_v, Some(MirandaBoolean(false)));
     }
 }
