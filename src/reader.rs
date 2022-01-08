@@ -202,24 +202,31 @@ fn parse_identifier(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str
 }
 
 fn parse_builtin_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    // println!("****************");
+    // println!("{}***", input);
+    // println!("****************");
     let (rest, first_val) = match preceded(
         multispace0,
-        alt((parse_integer, parse_float, parse_identifier)),
+        alt((parse_integer, parse_float, parse_identifier, list)),
     )(input)
     {
         Ok((r, found)) => (r, found),
         Err(e) => return Err(e),
     };
 
-    let (rest, builtin) =
-        match alt((preceded(multispace0, parse_builtin_op), parse_builtin_op))(rest) {
-            Ok((r, found)) => (r, found),
-            Err(e) => return Err(e),
-        };
+    let (rest, builtin) = match alt((
+        preceded(multispace0, parse_builtin_op),
+        parse_builtin_op,
+        list,
+    ))(rest)
+    {
+        Ok((r, found)) => (r, found),
+        Err(e) => return Err(e),
+    };
 
     let (rest, second_val) = match preceded(
         multispace0,
-        alt((parse_integer, parse_float, parse_identifier)),
+        alt((parse_integer, parse_float, parse_identifier, list)),
     )(rest)
     {
         Ok((r, found)) => (r, found),
@@ -502,7 +509,7 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     Ok((input, MirandaExpr::MirandaFloat(value)))
 }
 
-fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+pub fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let (rest_input, matched) = match alt((
         parse_function_declaration,
         parse_function_definition,
@@ -1071,7 +1078,7 @@ mod tests {
             MirandaExpr::MirandaBuiltInExpr(vec![
                 MirandaExpr::MirandaInt(1),
                 MirandaExpr::MirandaBuiltIn(BuiltIn::Plus),
-                MirandaExpr::MirandaInt(1)
+                MirandaExpr::MirandaInt(1),
             ])
         );
     }
