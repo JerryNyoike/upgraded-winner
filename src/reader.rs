@@ -2,9 +2,8 @@ use nom::{
     branch::alt,
     bytes::complete::{is_not, tag},
     character::complete::{alphanumeric1, char, digit1, i32, multispace0, multispace1, one_of},
-    combinator::recognize,
-    combinator::{map, map_res, peek, value},
-    error::{ParseError, VerboseError},
+    combinator::{all_consuming, map, map_res, peek, recognize, value},
+    error::{Error, ErrorKind, ParseError, VerboseError},
     multi::many0,
     multi::{separated_list0, separated_list1},
     number::complete::float,
@@ -414,7 +413,10 @@ pub fn parse_function_declaration(input: &str) -> IResult<&str, MirandaExpr, Ver
         Err(e) => return Err(e),
     };
 
-    let fun_type = FunType(fun_identifier.clone(), param_types.clone());
+    let fun_type = VarType(
+        fun_identifier.clone(),
+        MirandaType::Fun(param_types.clone()),
+    );
 
     Ok((rest, MirandaExpr::MirandaFunctionDeclaration(fun_type)))
 }
@@ -466,6 +468,8 @@ fn parse_function_definition_without_guard(
     //         = b + a, if b > a
     //         where
     //         x = a * a
+    //
+    // add a b = a + b
     let (fun, param_identifiers) =
         match preceded(multispace0, separated_list0(multispace1, parse_identifier))(input) {
             Ok((r, idens)) => (r, idens),
@@ -509,6 +513,49 @@ fn parse_float(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     Ok((input, MirandaExpr::MirandaFloat(value)))
 }
 
+fn parse_function_argument(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (rest, matched) = match alt((
+        parse_char_literal,
+        parse_integer,
+        parse_bool,
+        parse_float,
+        parse_string_literal,
+        parse_identifier,
+    ))(input)
+    {
+        Ok((r, found)) => (r, found),
+        Err(e) => return Err(e),
+    };
+
+    Ok((rest, matched))
+}
+
+fn parse_function_application(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
+    let (args, ident) = match parse_identifier(input) {
+        Ok((r, f_ident)) => (r, f_ident),
+        Err(e) => return Err(e),
+    };
+
+    let fun_ident: String;
+
+    match ident {
+        MirandaExpr::MirandaIdentifier(f_ident) => {
+            fun_ident = f_ident;
+        }
+        _ => panic!("Failed to parse function application."),
+    }
+
+    let (rest, args) = match (preceded(
+        multispace0,
+        separated_list0(multispace1, parse_function_argument),
+    ))(args)
+    {
+        Ok((r, matched)) => (r, matched),
+        Err(e) => return Err(e),
+    };
+    Ok((rest, MirandaExpr::MirandaFunctionCall(fun_ident, args)))
+}
+
 pub fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
     let (rest_input, matched) = match alt((
         parse_function_declaration,
@@ -525,6 +572,7 @@ pub fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>>
         list,
         parse_identifier,
         parse_builtin_op,
+        parse_function_application,
     ))(input)
     {
         Ok((r, m)) => (r, m),
@@ -961,9 +1009,9 @@ mod tests {
 
         assert_eq!(
             val,
-            MirandaExpr::MirandaFunctionDeclaration(FunType(
+            MirandaExpr::MirandaFunctionDeclaration(VarType(
                 "add".to_string(),
-                vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
+                MirandaType::Fun(vec![MirandaType::Int, MirandaType::Int, MirandaType::Int])
             ))
         );
     }
@@ -1021,6 +1069,25 @@ mod tests {
     }
 
     #[test]
+    fn parse_function_application_test() {
+        let input = "add 1 num2";
+        let mr = match parse_function_application(input) {
+            Ok((_, matched)) => matched,
+            Err(e) => panic!("Failed to parse: {}", e),
+        };
+
+        assert_eq!(
+            mr,
+            MirandaExpr::MirandaFunctionCall(
+                "add".to_string(),
+                vec![
+                    MirandaExpr::MirandaInt(1),
+                    MirandaExpr::MirandaIdentifier("num2".to_string())
+                ]
+            )
+        );
+    }
+    #[test]
     fn parse_expr_test() {
         let inp = "inp";
 
@@ -1050,9 +1117,9 @@ mod tests {
 
         assert_eq!(
             val2,
-            MirandaExpr::MirandaFunctionDeclaration(FunType(
+            MirandaExpr::MirandaFunctionDeclaration(VarType(
                 "add".to_string(),
-                vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]
+                MirandaType::Fun(vec![MirandaType::Int, MirandaType::Int, MirandaType::Int]),
             ),)
         );
 
@@ -1064,6 +1131,11 @@ mod tests {
                 MirandaExpr::MirandaInt(1)
             ])
         );
+
+        assert_eq!(
+            val4,
+            MirandaExpr::MirandaBindingDeclaration(VarType("x".to_string(), MirandaType::Int))
+        )
     }
 
     #[test]
