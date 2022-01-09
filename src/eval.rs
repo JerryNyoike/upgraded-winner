@@ -2,116 +2,6 @@ use crate::reader::parse_expr;
 use crate::types::*;
 use std::any::Any;
 
-// fn analyze_self_evaluating(expr: MirandaExpr) -> impl Fn {
-//     move |env: Env| match expr {
-//         _ => unreachable!(), // panic!("Error! Not a literal"),
-//     }
-// }
-
-// fn analyze_binding(expr: MirandaExpr) -> Fn(Env) {
-//     move |env: Env| match expr {
-//         MirandaExpr::MirandaIdentifier(ident) => {
-//             // lookup the variable in the function table and the variables table
-//             if env.name_lookup(ident) {
-//                 if let Some(var) = env.binding_value(ident) {
-//                     let val = eval(var);
-//                     val
-//                 } else if let Some(fun) = env.function_body() {
-//                     let val = eval(fun);
-//                     val
-//                 }
-//             }
-//             None
-//         }
-//         _ => unreachable!(),
-//     }
-// }
-
-// fn analyze_if(expr: MirandaExpr) -> impl Fn {
-//     move |env: Env| match expr {
-//         MirandaExpr::MirandaIf(expr1, op, expr2) => {
-//             let val1 = eval(expr1, env);
-//             let val2 = eval(expr2, env);
-//             match op {
-//                 MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan) => val1 > val2,
-//                 MirandaExpr::MirandaBuiltIn(BuiltIn::LessThan) => val1 < val2,
-//                 _ => panic!("The if predicate must use a boolean operator"),
-//             }
-//         }
-//         _ => unreachable!(),
-//     }
-// }
-
-// fn analyze_binding_declaration(expr: MirandaExpr) -> impl Fn {
-//     move |env: Env| match expr {
-//         MirandaExpr::MirandaBindingDeclaration((ident, typ)) => env.extend_var(ident, typ),
-//         _ => unreachable!(),
-//     }
-// }
-
-// fn analyze_function_declaration(expr: MirandaExpr) -> impl Fn {
-//     move |env: Env| match expr {
-//         MirandaExpr::MirandaFunctionDeclaration((ident, param_types)) => {
-//             env.extend_fn(ident, param_types)
-//         }
-//         _ => unreachable!(),
-//     }
-// }
-
-// fn analyze_binding_definition(expr: MirandaExpr) -> impl Fn {
-//     move |env| match expr {
-//         MirandaExpr::MirandaBindingDefinition(ident, expr1) => {
-//             let val = eval(*expr1, env);
-//             let typ = env.variable_lookup(ident);
-//         }
-//     }
-// }
-
-// fn analyze_function_definition(expr: MirandaExpr) -> impl Fn {
-//     move |env: Env| match expr {
-//         MirandaExpr::MirandaBindingDefinition(ident, body) => {
-//             todo!()
-//         }
-//         _ => unreachable!(),
-//     }
-// }
-
-// fn eval_if_predicate(pred: Vec<MirandaExpr>, env: Env) -> MirandaExpr {
-//     match pred {
-//         MirandaExpr::MirandaBuiltInExpr(op1, operator, op2) => match operator {
-//             MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan) => match op1 {
-//                 MirandaExpr::MirandaIdentifier(iden) => {
-//                     let val = eval(&iden, env);
-//                     match op2 {
-//                         MirandaExpr::MirandaIdentifier(iden2) => {
-//                             let val2 = eval(&iden2, env);
-//                             MirandaExpr::MirandaBoolean(val > val2)
-//                         }
-//                         _ => panic!("Can only compare values of the same type"),
-//                     }
-//                 }
-//                 MirandaExpr::MirandaInt(num1) => match op2 {
-//                     MirandaExpr::MirandaInt(num2) => MirandaExpr::MirandaBoolean(num1 > num2),
-//                     _ => panic!("Can only compare values of the same type"),
-//                 },
-//                 MirandaExpr::MirandaFloat(float1) => match op2 {
-//                     MirandaExpr::MirandaFloat(float2) => {
-//                         MirandaExpr::MirandaBoolean(float1 > float2)
-//                     }
-//                 },
-//             },
-//             MirandaExpr::MirandaBuiltIn(BuiltIn::LessThan) => match op1 {
-//                 MirandaExpr::MirandaIdentifier(iden) => todo!(),
-//                 MirandaExpr::MirandaInt(num1) => todo!(),
-//                 MirandaExpr::MirandaFloat(float1) => todo!(),
-//             },
-//             _ => unreachable!(),
-//         },
-//     }
-// }
-
-fn apply() {}
-
 pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
     use crate::types::{BuiltIn::*, MirandaExpr::*};
 
@@ -124,43 +14,71 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
         MirandaExpr::MirandaList(list) => Some(MirandaExpr::MirandaList(list.clone())),
         MirandaExpr::MirandaIdentifier(id) => {
             // ************THIS IS WRONG!**********//
-          // check that identifier is declared and defined in the environment
-          match env.lookup(id) {
-              Ok(typ) => {
-                match typ.1 {
-                    MirandaType::Fun(typ) => {
-                        // get the function body
-                        if let Some(fun_bod) = env.function_body(id) {
-                            let mut ts = vec![];
-                            for t in typ {
-                                match t {
-                                    MirandaType::Bool => ts.push(MirandaExpr::MirandaBoolean(true)),
-                                    MirandaType::Int => ts.push(MirandaExpr::MirandaInt(1)),
-                                    MirandaType::Float => ts.push(MirandaExpr::MirandaFloat(0.9)),
-                                    MirandaType::List(lstyp) => ts.push(MirandaExpr::MirandaList(vec![])) ,
-                                    MirandaType::Char => ts.push(MirandaExpr::MirandaChar('a')),
-                                    MirandaType::String => ts.push(MirandaExpr::MirandaString("".to_string())),
-                                    _ => unreachable!()
-                                };          
+            // check that identifier is declared and defined in the environment
+            match env.lookup(id) {
+                Ok(typ) => {
+                    match typ.1 {
+                        MirandaType::Fun(typ) => {
+                            // get the function body
+                            if let Some(fun_bod) = env.function_body(id) {
+                                let mut ts = vec![];
+                                for t in typ {
+                                    match t {
+                                        MirandaType::Bool => {
+                                            ts.push(MirandaExpr::MirandaBoolean(true))
+                                        }
+                                        MirandaType::Int => ts.push(MirandaExpr::MirandaInt(1)),
+                                        MirandaType::Float => {
+                                            ts.push(MirandaExpr::MirandaFloat(0.9))
+                                        }
+                                        MirandaType::List(_) => {
+                                            ts.push(MirandaExpr::MirandaList(vec![]))
+                                        }
+                                        MirandaType::Char => ts.push(MirandaExpr::MirandaChar('a')),
+                                        MirandaType::String => {
+                                            ts.push(MirandaExpr::MirandaString("".to_string()))
+                                        }
+                                        _ => unreachable!(),
+                                    };
+                                }
+                                Some(MirandaExpr::MirandaList(ts))
+                            } else {
+                                println!(
+                                    "Function declared but not defined. Type Error: {}",
+                                    TypeError::NotInScope
+                                );
+                                None
                             }
-                            Some(MirandaExpr::MirandaList(ts))
-                        } else {
-                            println!("Function declared but not defined. Type Error: {}", TypeError::NotInScope);
-                            None
                         }
-                    },
-                    _ => {
-                        // fetch from the vars in the environment 
-                        env.binding_value(id)
+                        _ => {
+                            // fetch from the vars in the environment
+                            println!("%%%%%%%%%");
+                            println!("{:#?}", env.get_function_env()[0]);
+                            println!("%%%%%%%%%");
+                            if let Some(bind) = env.binding_value(id) {
+                                Some(bind)
+                            } else if let Some(local_bind) = env.get_function_env()[0].binding_value(id) {
+                                Some(local_bind)
+                            } else {
+                                None
+                            }
+                        }
                     }
                 }
-              }
-              Err(e) => {
-                  println!("Type Error: {}", e);
-                  None
-              }
-          }
-        },
+                Err(e) => {
+                    // check local environment
+                    let ref mut l_env = env.get_function_env();
+                    if l_env.len() > 0 {
+                        println!("::::::::::::::");
+                        println!("{:#?}", l_env[0]);  
+                        let ref mut fn_env = l_env[0];
+                        return eval(expr, fn_env);
+                    }
+                    println!("Type Error: {}", e);
+                    None
+                }
+            }
+        }
         // MirandaExpr::MirandaIf(pred) => eval_if_predicate(*pred, env),
         MirandaBuiltInExpr(built_in_expr) => {
             // TODO support use of bindings in the expression
@@ -452,67 +370,79 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
         }
         MirandaFunctionCall(ident, args) => {
             // check types of arguments
-            let mut function_env = Env::new();
-            env.add_function_env(function_env);
+            let ref mut function_env = Env::new();
 
-            if let MirandaType::Fun(fn_typ) = env.lookup(&ident).unwrap().1 { 
-            for (pos, arg) in args.iter().enumerate() {
-                match check(arg, env) {
-                    Ok(arg_typ) => {
-                        if arg_typ != fn_typ[pos] {
-                            println!("Type Error: {}", TypeError::Mismatch);
-                            println!("From in here arg: {}, arg_type: {:#?}, expected: {:#?}", arg, arg_typ, fn_typ[pos]);
-                            return None;
-                        } else {
-                            if let Some(function_details) = env.get_fun_value(&ident) {
-                                let mut l_env = Env::new();
-                                let param_names = function_details.get_params();
-                                function_env.
+            if let MirandaType::Fun(fn_typ) = env.lookup(&ident).unwrap().1 {
+                for (pos, arg) in args.iter().enumerate() {
+                    match check(arg, env) {
+                        Ok(arg_typ) => {
+                            if arg_typ != fn_typ[pos] {
+                                println!("Type Error: {}", TypeError::Mismatch);
+                                println!(
+                                    "From in here arg: {}, arg_type: {:#?}, expected: {:#?}",
+                                    arg, arg_typ, fn_typ[pos]
+                                );
+                                return None;
+                            } else {
+                                if let Some(function_details) = env.get_fun_value(&ident) {
+                                    let param_names = function_details.get_params();
+                                    // function_env.
 
-                                for (arg, p_name) in args.iter().zip(param_names) {
-                                    // build up local env
-                                    match check(arg, env) {
-                                        Ok(arg_typ) => {
-                                            l_env.extend_var(p_name, arg_typ);
-                                        }
-                                        Err(e) => {
-                                            println!("Type Error: {}", e);
-                                            println!("From number2");
-                                        }
-                                    };
-                                }
-
-                                // evaluate the function body
-                                // TODO add support for function guards
-                                let fun_body = function_details.get_body();
-
-                                // if the function has guards, find the guard that evals to true and evaluate
-                                // its body
-                                // add 1 ""
-                                if fun_body.len() > 1
-                                    && fun_body.iter().all(|ref elem| elem.len() == 2)
-                                {
-                                    for bod in fun_body {
-                                        match eval(&bod[1], env) {
-                                            Some(MirandaBoolean(true)) => eval(&bod[0], env),
-                                            _ => continue,
+                                    for (arg, p_name) in args.iter().zip(param_names) {
+                                        // build up local env
+                                        match check(arg, env) {
+                                            Ok(arg_typ) => {
+                                                function_env.extend_var(p_name.clone(), arg_typ);
+                                                function_env
+                                                    .set_var_value(p_name.clone(), arg.clone());
+                                            }
+                                            Err(e) => {
+                                                println!("Type Error: {}", e);
+                                                println!("From number2");
+                                            }
                                         };
                                     }
-                                } else {
-                                    // body contains no guards, eval the first element of the body list
-                                    return eval(&fun_body[0][0], env);
+
+                                    // println!("^^^^^^^^^^");
+                                    // println!("{:#?}", function_env.clone());
+                                    // println!("^^^^^^^^^^");
+                                    env.add_function_env(function_env.clone());
+
+                                    // evaluate the function body
+                                    // TODO add support for function guards
+                                    let fun_body = function_details.get_body();
+
+                                    // if the function has guards, find the guard that evals to true and evaluate
+                                    // its body
+                                    // add 1 ""
+                                    if fun_body.len() > 1
+                                        && fun_body.iter().all(|ref elem| elem.len() == 2)
+                                    {
+                                        for bod in fun_body {
+                                            match eval(&bod[1], env) {
+                                                Some(MirandaBoolean(true)) => eval(&bod[0], env),
+                                                _ => continue,
+                                            };
+                                        }
+                                    } else {
+                                        // body contains no guards, eval the first element of the body list
+                                        // println!("&&&&&&&&&&&&&&");
+                                        // println!("{:#?}", env);
+                                        // println!("&&&&&&&&&&&&&&");
+                                        return eval(&fun_body[0][0], env);
+                                    }
                                 }
+                                println!("No function details");
+                                return None;
                             }
-                            println!("No function details");
+                        }
+                        Err(e) => {
+                            println!("Function not defined. Error: {}", e);
                             return None;
                         }
-                    }
-                    Err(e) => {
-                        println!("Function not defined. Error: {}", e);
-                        return None;
-                    }
-                };
-            }}
+                    };
+                }
+            }
             return None;
         }
         _ => panic!("{:#?}", expr),
@@ -661,6 +591,31 @@ mod tests {
         assert_eq!(ls_def, Some(MirandaBoolean(true)));
         assert_eq!(fun_def, Some(MirandaBoolean(true)));
 
-        assert_eq!(fun_app, Some(MirandaInt(24)))
+        let fun_def = eval(
+            &MirandaFunctionDefinition(
+                "add".to_string(),
+                vec!["a".to_string(), "b".to_string()],
+                vec![vec![MirandaBuiltInExpr(vec![
+                    MirandaIdentifier("a".to_string()),
+                    MirandaBuiltIn(BuiltIn::Plus),
+                    MirandaIdentifier("b".to_string()),
+                ])]],
+            ),
+            test_env,
+        );
+
+        let fun_app = eval(
+            &MirandaExpr::MirandaFunctionCall(
+                "add".to_string(),
+                vec![
+                    MirandaExpr::MirandaInt(1),
+                    MirandaExpr::MirandaIdentifier("age".to_string()),
+                ],
+            ),
+            test_env,
+        );
+
+        assert_eq!(fun_app, Some(MirandaInt(24)));
+        assert_eq!(fun_def, Some(MirandaBoolean(true)));
     }
 }
