@@ -70,9 +70,12 @@ pub enum MirandaExpr {
     MirandaList(Vec<MirandaExpr>),
     MirandaIdentifier(String),
     MirandaIf(Box<MirandaExpr>),
-    MirandaBinding(VarType, Box<MirandaExpr>),
-    MirandaFunction(FunType, Vec<VarType>, Vec<Vec<MirandaExpr>>),
+    MirandaBindingDeclaration(VarType),
+    MirandaBindingDefinition(Ident, Box<MirandaExpr>),
+    MirandaFunctionDeclaration(FunType),
+    MirandaFunctionDefinition(Ident, Vec<Ident>, Vec<Vec<MirandaExpr>>),
     MirandaBuiltInExpr(Vec<MirandaExpr>),
+    MirandaFunctionApplication(Ident, Vec<MirandaExpr>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -116,14 +119,14 @@ impl Env {
         if let Some(x) = self.funs_table.get(identifier) {
             return Some((*x).clone());
         }
-        return None;
+        None
     }
 
     pub fn variable_lookup(&self, identifier: &Ident) -> Option<VarType> {
         if let Some(x) = self.vars_table.get(identifier) {
             return Some((*x).clone());
         }
-        return None;
+        None
     }
 
     // insert a variable to table
@@ -147,16 +150,14 @@ impl Env {
     // returns false if the name is not found in the symbol table
     // true otherwise
     fn name_lookup(&self, id: Ident) -> bool {
-        if let None = self.variable_lookup(&id) {
-            if let None = self.function_lookup(&id) {
-                return false;
-            }
+        if self.variable_lookup(&id).is_none() && self.function_lookup(&id).is_none() {
+            return false;
         }
         true
     }
 
     // checks if variable identifier has specified type
-    fn check_var(&self, id: Ident, t: MirandaType) -> bool {
+    fn check_var(&self, _id: Ident, _t: MirandaType) -> bool {
         // if let Some(v) = variable_lookup()
         false
     }
