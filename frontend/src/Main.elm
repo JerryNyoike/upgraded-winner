@@ -436,23 +436,6 @@ viewHelpButton model =
         }
 
 
-viewAddCellButton : E.Element Msg
-viewAddCellButton =
-    Input.button
-        [ E.centerX
-        , E.alignBottom
-        , E.paddingXY 0 20
-        ]
-        { onPress =
-            Just AddCell
-        , label =
-            E.html
-                (FeatherIcons.plusCircle
-                    |> FeatherIcons.toHtml []
-                )
-        }
-
-
 viewCell : Int -> Int -> ( String, Maybe String ) -> Model -> E.Element Msg
 viewCell activeCellIndex currentCellIndex ( src, result ) model =
     let
@@ -500,12 +483,6 @@ viewCell activeCellIndex currentCellIndex ( src, result ) model =
 
                       else
                         Font.color model.colors.lightFg
-                    , E.below <|
-                        if activeCellIndex == currentCellIndex then
-                            viewAddCellButton
-
-                        else
-                            E.none
                     ]
                 <|
                     E.text <|
