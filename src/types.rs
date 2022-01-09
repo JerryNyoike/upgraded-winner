@@ -12,6 +12,64 @@ pub enum MirandaType {
     List(Box<MirandaType>),
     Char,
     String,
+    Fun(Vec<MirandaType>),
+    Nil,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum TypeError {
+    Mismatch,
+    NotAFunction,
+    NotInScope,
+}
+
+pub fn check(expr: &MirandaExpr, env: &Env) -> Result<MirandaType, TypeError> {
+    match expr {
+        MirandaExpr::MirandaInt(_) => Ok(MirandaType::Int),
+        MirandaExpr::MirandaBoolean(_) => Ok(MirandaType::Bool),
+        MirandaExpr::MirandaList(elems) => {
+            let elem_type = check(&elems[0].clone(), env);
+            match elem_type {
+                Ok(el_typ) => Ok(MirandaType::List(Box::new(el_typ))),
+                Err(typ_err) => Err(typ_err),
+            }
+        }
+        MirandaExpr::MirandaChar(_) => Ok(MirandaType::Char),
+        MirandaExpr::MirandaString(_) => Ok(MirandaType::String),
+        MirandaExpr::MirandaBuiltInExpr(b_expr) => {
+            let t1 = check(&b_expr[0].clone(), env).unwrap();
+            let t2 = check(&b_expr[2].clone(), env).unwrap();
+            match b_expr[1] {
+                MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan) => Ok(MirandaType::Bool),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::LessThan) => Ok(MirandaType::Bool),
+                MirandaExpr::MirandaBuiltIn(BuiltIn::Equal) => Ok(MirandaType::Bool),
+                _ => {
+                    if t1 == t2 {
+                        return Ok(t2);
+                    }
+                    return Err(TypeError::Mismatch);
+                }
+            }
+        }
+        MirandaExpr::MirandaIdentifier(ident) => {
+            // check if the identifier is bound to something in the environment or function frames
+            match env.variable_lookup(ident) {
+                Ok(vartype) => Ok(vartype.1),
+                Err(_) => Err(TypeError::NotInScope),
+            }
+        }
+        _ => Ok(MirandaType::Nil),
+    }
+}
+
+impl fmt::Display for TypeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TypeError::Mismatch => write!(f, "Type mismatch"),
+            TypeError::NotAFunction => write!(f, "Not a function"),
+            TypeError::NotInScope => write!(f, "Not in scope"),
+        }
+    }
 }
 
 impl ToString for MirandaType {
@@ -23,6 +81,14 @@ impl ToString for MirandaType {
             MirandaType::Char => "char".to_string(),
             MirandaType::String => "string".to_string(),
             MirandaType::List(x) => "list ".to_string() + &(*x).to_string(),
+            MirandaType::Nil => "()".to_string(),
+            MirandaType::Fun(typ) => {
+                let mut typ_str_arr: Vec<String> = vec![];
+                for (n, t) in typ.clone().iter().enumerate() {
+                    typ_str_arr.push(t.to_string());
+                }
+                typ_str_arr.join(" -> ")
+            }
         }
     }
 }
@@ -125,13 +191,37 @@ pub enum Keyword {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct UserFunc {
-    frame_id: u32,
+    // frame_id: u32,
+    params: Vec<Ident>,
+    body: Vec<Vec<MirandaExpr>>,
+}
+
+impl UserFunc {
+    fn new() -> Self {
+        Self {
+            params: vec![],
+            body: vec![],
+        }
+    }
+
+    pub fn set_params(&mut self, params: Vec<Ident>) {
+        self.params = params
+    }
+
+    pub fn set_body(&mut self, body: Vec<Vec<MirandaExpr>>) {
+        self.body = body.clone()
+    }
+
+    fn clear_params(&mut self) {
+        self.params = Vec::new()
+    }
 }
 
 pub struct Env {
     funs_table: FunTable,
     vars_table: VarTable,
-    values: HashMap<Ident, Vec<MirandaExpr>>,
+    var_values: HashMap<Ident, Vec<MirandaExpr>>,
+    fun_values: HashMap<Ident, UserFunc>,
 }
 
 impl Env {
@@ -139,22 +229,23 @@ impl Env {
         Self {
             funs_table: HashMap::new(),
             vars_table: HashMap::new(),
-            values: HashMap::new(),
+            var_values: HashMap::new(),
+            fun_values: HashMap::new(),
         }
     }
 
-    pub fn function_lookup(&self, identifier: &Ident) -> Option<FunType> {
+    pub fn function_lookup(&self, identifier: &Ident) -> Result<FunType, TypeError> {
         if let Some(x) = self.funs_table.get(identifier) {
-            return Some((*x).clone());
+            return Ok((*x).clone());
         }
-        None
+        Err(TypeError::NotInScope)
     }
 
-    pub fn variable_lookup(&self, identifier: &Ident) -> Option<VarType> {
+    pub fn variable_lookup(&self, identifier: &Ident) -> Result<VarType, TypeError> {
         if let Some(x) = self.vars_table.get(identifier) {
-            return Some((*x).clone());
+            return Ok((*x).clone());
         }
-        None
+        Err(TypeError::NotInScope)
     }
 
     pub fn function_body(&self, identifier: &Ident) -> Option<Vec<MirandaExpr>> {
@@ -162,7 +253,7 @@ impl Env {
             match x {
                 FunType(id, _) => {
                     // get the function body from the environment
-                    if let Some(fun_body) = self.values.get(id) {
+                    if let Some(fun_body) = self.fun_values.get(id) {
                         Some(fun_body)
                     } else {
                         println!("Function declared but not defined");
@@ -180,7 +271,7 @@ impl Env {
             match x {
                 VarType(id, _) => {
                     // get the function body from the environment
-                    if let Some(var_value) = self.values.get(id) {
+                    if let Some(var_value) = self.var_values.get(id) {
                         Some(var_value)
                     } else {
                         println!("Variable {} declared but not defined", identifier);
@@ -194,41 +285,60 @@ impl Env {
     }
 
     // insert a variable to table
-    fn extend_var(&mut self, id: Ident, t: MirandaType) {
-        if let Some(v) = self.variable_lookup(&id) {
-            println!("Variable {} {} already defined", v.0, v.1.to_string());
-            return;
+    pub fn extend_var(&mut self, id: Ident, t: MirandaType) {
+        match self.variable_lookup(&id) {
+            Ok(v) => {
+                println!("Variable {} {} already defined", v.0, v.1.to_string());
+                return;
+            }
+            Err(_) => {
+                self.vars_table.insert(id.clone(), VarType::new(id, t));
+            }
         }
-        self.vars_table.insert(id.clone(), VarType::new(id, t));
     }
 
     // set the value of the variable
     pub fn set_var_value(&mut self, id: Ident, val: MirandaExpr) {
         if self.name_lookup(&id) {
-            self.values.insert(id, vec![val]);
+            self.var_values.insert(id, vec![val]);
         }
     }
 
     // set function body
-    pub fn set_fun_value(&mut self, id: Ident, val: Vec<MirandaExpr>) {
-        if self.name_lookup(&id) {
-            self.values.insert(id, val);
+    pub fn set_fun_value(&mut self, id: Ident, params: Vec<Ident>, body: Vec<Vec<MirandaExpr>>) {
+        match self.function_lookup(&id) {
+            Ok(funtype) => {
+                let mut fun = UserFunc::new();
+                fun.set_params(params.clone());
+                fun.set_body(body);
+                // extend environment with function params and types
+                for (param, param_typ) in params.iter().zip(funtype.1.iter()) {
+                    self.extend_var(param.to_string(), param_typ.clone())
+                }
+
+                self.fun_values.insert(id, fun);
+            }
+            Err(e) => println!("Function {} is not defined. Error: {}", id, e),
         }
     }
 
     // insert a function to the table
-    fn extend_fn(&mut self, id: Ident, t: Vec<MirandaType>) {
-        if let Some(f) = self.function_lookup(&id) {
-            println!("Function {} is already defined", f);
-            return;
+    pub fn extend_fn(&mut self, id: Ident, t: Vec<MirandaType>) {
+        match self.function_lookup(&id) {
+            Ok(f) => {
+                println!("Function {} is already defined", f);
+                return;
+            }
+            Err(_) => {
+                self.funs_table.insert(id.clone(), FunType::new(id, t));
+            }
         }
-        self.funs_table.insert(id.clone(), FunType::new(id, t));
     }
 
     // returns false if the name is not found in the symbol table
     // true otherwise
     pub fn name_lookup(&self, id: &Ident) -> bool {
-        if self.variable_lookup(id).is_none() && self.function_lookup(id).is_none() {
+        if self.variable_lookup(id).is_err() && self.function_lookup(id).is_err() {
             return false;
         }
         true
