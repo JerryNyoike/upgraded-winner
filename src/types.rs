@@ -236,6 +236,7 @@ impl UserFunc {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Env {
     vars_table: VarTable,
     var_values: HashMap<Ident, Vec<MirandaExpr>>,
@@ -251,6 +252,10 @@ impl Env {
             fun_values: HashMap::new(),
             local_env: vec![],
         }
+    }
+
+    pub fn get_function_env(&self) -> Vec<Env> {
+        self.local_env.clone()
     }
 
     pub fn add_function_env(&mut self, env: Env) {
@@ -284,9 +289,11 @@ impl Env {
 
     pub fn binding_value(&self, identifier: &Ident) -> Option<MirandaExpr> {
         if let Some(x) = self.vars_table.get(identifier) {
+            println!("got");
             match x {
                 VarType(id, _) => {
                     // get the function body from the environment
+                    println!("{} -> {:#?}", id, self.var_values.get(identifier));
                     if let Some(var_value) = self.var_values.get(id) {
                         Some(var_value)
                     } else {
