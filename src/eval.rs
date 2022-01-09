@@ -351,6 +351,82 @@ pub fn eval(expr: MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
                 None
             }
         }
+        MirandaBindingDeclaration(vartype) => {
+            // check if the variable already exists, alert user you cannot redefine but continue
+            // execution.
+            env.extend_var(vartype.0, vartype.1);
+            Some(MirandaBoolean(true))
+        }
+        MirandaFunctionDeclaration(funtype) => {
+            env.extend_fn(funtype.0, funtype.1);
+            Some(MirandaBoolean(true))
+        }
+        MirandaBindingDefinition(ref ident, ref val) => {
+            //check that the binding type has been declared
+            match env.variable_lookup(&ident) {
+                Ok(vartype) => {
+                    let expr_type = check(&val, env);
+                    match expr_type {
+                        Ok(typ) => {
+                            if typ == vartype.1 {
+                                // same type as declared
+                                env.set_var_value(ident.to_string(), *val.clone());
+                                Some(MirandaBoolean(true))
+                            } else {
+                                None
+                            }
+                        }
+                        Err(e) => {
+                            println!("Type error: {}", e);
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "Variable {} type must be declared before use. Error: {}",
+                        ident, e
+                    );
+                    None
+                }
+            }
+        }
+        MirandaFunctionDefinition(ident, params, body) => {
+            // check that function type is declared
+            match env.function_lookup(&ident) {
+                Ok(funtype) => {
+                    // function exists,
+                    // check the body type
+                    for (pos, opt) in body[0].iter().enumerate() {
+                        match check(opt, env) {
+                            Ok(typ) => {
+                                println!("Got here!");
+                                println!("{:#?}", typ);
+                                println!("{:#?}", funtype.1[pos]);
+                                println!("{:#?}", opt);
+                                if typ == funtype.1[pos] {
+                                    continue;
+                                } else {
+                                    println!("Type Error. {}", TypeError::Mismatch);
+                                    return None;
+                                }
+                            }
+                            Err(e) => {
+                                println!("Type Error. {}", e);
+                                return None;
+                            }
+                        }
+                    }
+                    // all types match create an entry in fun_values for the function
+                    env.set_fun_value(ident, params, body);
+                    Some(MirandaBoolean(true))
+                }
+                Err(e) => {
+                    println!("Function not defined. Error: {}", e);
+                    None
+                }
+            }
+        }
         _ => panic!(),
     }
 }
@@ -407,6 +483,56 @@ mod tests {
             test_env,
         );
 
+        let age_dec = eval(
+            MirandaBindingDeclaration(VarType("age".to_string(), MirandaType::Int)),
+            test_env,
+        );
+
+        let ls_dec = eval(
+            MirandaBindingDeclaration(VarType(
+                "stus".to_string(),
+                MirandaType::List(Box::new(MirandaType::Int)),
+            )),
+            test_env,
+        );
+
+        let fun_dec = eval(
+            MirandaFunctionDeclaration(FunType(
+                "add".to_string(),
+                vec![MirandaType::Int, MirandaType::Int, MirandaType::Int],
+            )),
+            test_env,
+        );
+
+        let var_def = eval(
+            MirandaBindingDefinition("age".to_string(), Box::new(MirandaInt(23))),
+            test_env,
+        );
+        let ls_def = eval(
+            MirandaBindingDefinition(
+                "stus".to_string(),
+                Box::new(MirandaList(vec![
+                    MirandaInt(1),
+                    MirandaInt(2),
+                    MirandaInt(3),
+                ])),
+            ),
+            test_env,
+        );
+
+        let fun_def = eval(
+            MirandaFunctionDefinition(
+                "add".to_string(),
+                vec!["a".to_string(), "b".to_string()],
+                vec![vec![MirandaBuiltInExpr(vec![
+                    MirandaIdentifier("a".to_string()),
+                    MirandaBuiltIn(BuiltIn::Plus),
+                    MirandaIdentifier("b".to_string()),
+                ])]],
+            ),
+            test_env,
+        );
+
         assert_eq!(
             list_val,
             Some(MirandaExpr::MirandaList(vec![
@@ -430,5 +556,10 @@ mod tests {
         );
         assert_eq!(bool_v, Some(MirandaExpr::MirandaBoolean(false)));
         assert_eq!(if_v, Some(MirandaBoolean(false)));
+        assert_eq!(age_dec, Some(MirandaBoolean(true)));
+        assert_eq!(ls_dec, Some(MirandaBoolean(true)));
+        assert_eq!(var_def, Some(MirandaBoolean(true)));
+        assert_eq!(ls_def, Some(MirandaBoolean(true)));
+        assert_eq!(fun_def, Some(MirandaBoolean(true)));
     }
 }
