@@ -1,6 +1,5 @@
 port module Main exposing (main)
 
-
 import Browser
 import Browser.Dom
 import Browser.Events
@@ -602,7 +601,7 @@ update msg model =
         let
             (input, _) =
                 Maybe.withDefault emptyCell
-                <| Dict.get model.activeCellIndex model.cells
+                <| Dict.get (model.activeCellIndex - 1) model.cells
 
             newCells = Dict.insert (model.activeCellIndex - 1) (input, res) model.cells
             newModel =

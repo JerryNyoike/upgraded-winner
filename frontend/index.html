@@ -9,8 +9,9 @@
     <script src="elm.js"></script>
     <main></main>
     <script>
-     var app = Elm.Main.init({node: document.querySelector("main"),
-                              flags: null
+     var app = Elm.Main.init({
+       node: document.querySelector("main"),
+       flags: null,
      });
 
      app.ports.sendCode.subscribe(function(code){
