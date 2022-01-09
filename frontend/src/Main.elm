@@ -287,25 +287,12 @@ viewHelpPopUp model =
   E.column
   (styles.popUp ++ [ Background.color model.colors.darkBg ])
   [ E.el styles.title <| E.text "Help"
-  , E.el styles.subtitle <| E.text "Syntax"
   , E.paragraph
     [ E.htmlAttribute <| Html.Attributes.style "max-width" "60vw"
     ]
-    [ E.text "Untyped lambda calculus has 3 components:"
+    [ E.text "Wasmiranda: "
     ]
-  , E.text "Variable:    x"
-  , E.text "Abstraction: \\x. t"
-  , E.text "Application: t1 t2"
   , E.el styles.subtitle <| E.text "Keyboard Shortcuts"
-  , E.row
-    []
-    [ E.html
-      ( FeatherIcons.arrowUp
-      |> FeatherIcons.toHtml
-        [ Html.Attributes.style "margin-right" "20px" ]
-      )
-    , E.text "Go to prev cell"
-    ]
   , E.row
     []
     [ E.html
@@ -340,7 +327,7 @@ viewHelpPopUp model =
   , E.el styles.subtitle <| E.text "Source Code"
   , E.newTabLink []
     { url =
-      "https://github.com/AlienKevin/lambda-calculus-untyped"
+      "https://github.com/JerryNyoike/upgraded-winner"
     , label =
       E.el
       [ Font.underline ] <|
@@ -680,13 +667,6 @@ getThemeColors theme =
         E.rgb255 255 255 255
       }
 
-
-{- row
-    = -1 -- cursor at middle of the cell
-    = 0  -- cursor at both the top and the bottom of the cell (cell has a single row)
-    = 1  -- cursor at the top of the cell
-    = 2  -- cursor at the bottom of the cell
--}
 gotCellCursorRow : Int -> Model -> (Model, Cmd Msg)
 gotCellCursorRow row model =
   case model.pendingKeyAction of
@@ -960,17 +940,6 @@ decodeTheme =
         _ ->
           Decode.fail "Invalid theme"
     )
-
-
-encodeModel : Model -> Encode.Value
-encodeModel model =
-  Encode.object
-    [ ( "cells", Encode.list Encode.string <| List.map Tuple.first <| Dict.values model.cells )
-    , ( "activeCellIndex", Encode.int model.activeCellIndex )
-    , ( "theme", encodeTheme model.theme )
-    , ( "useLigatures", Encode.bool model.useLigatures )
-    , ( "fontSize", Encode.int model.fontSize )
-    ]
 
 
 encodeTheme : Theme -> Encode.Value
