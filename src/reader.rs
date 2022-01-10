@@ -74,18 +74,30 @@ fn parse_num(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
 }
 
 fn parse_builtin_op(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>> {
-    let (input, t) = one_of("+-*/=%><")(input)?;
+    let (input, t) = match alt((
+        tag("+"),
+        tag("-"),
+        tag("*"),
+        tag("/"),
+        tag("%"),
+        tag("=="),
+        tag(">"),
+        tag("<")))(input){
+        Ok((rest, found)) => (rest, found),
+        Err(e) => return Err(e)
+    };
+    
     Ok((
         input,
         match t {
-            '+' => MirandaExpr::MirandaBuiltIn(BuiltIn::Plus),
-            '-' => MirandaExpr::MirandaBuiltIn(BuiltIn::Minus),
-            '*' => MirandaExpr::MirandaBuiltIn(BuiltIn::Times),
-            '/' => MirandaExpr::MirandaBuiltIn(BuiltIn::Divide),
-            '=' => MirandaExpr::MirandaBuiltIn(BuiltIn::Equal),
-            '%' => MirandaExpr::MirandaBuiltIn(BuiltIn::Mod),
-            '>' => MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
-            '<' => MirandaExpr::MirandaBuiltIn(BuiltIn::LessThan),
+            "+" => MirandaExpr::MirandaBuiltIn(BuiltIn::Plus),
+            "-" => MirandaExpr::MirandaBuiltIn(BuiltIn::Minus),
+            "*" => MirandaExpr::MirandaBuiltIn(BuiltIn::Times),
+            "/" => MirandaExpr::MirandaBuiltIn(BuiltIn::Divide),
+            "==" => MirandaExpr::MirandaBuiltIn(BuiltIn::Equal),
+            "%" => MirandaExpr::MirandaBuiltIn(BuiltIn::Mod),
+            ">" => MirandaExpr::MirandaBuiltIn(BuiltIn::GreaterThan),
+            "<" => MirandaExpr::MirandaBuiltIn(BuiltIn::LessThan),
             _ => unreachable!(),
         },
     ))
@@ -563,6 +575,7 @@ pub fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>>
         parse_function_definition_without_guard,
         parse_variable_declaration,
         parse_variable_definition,
+        parse_function_application,
         parse_builtin_expr,
         parse_bool,
         parse_char_literal,
@@ -570,10 +583,8 @@ pub fn parse_expr(input: &str) -> IResult<&str, MirandaExpr, VerboseError<&str>>
         parse_integer,
         parse_float,
         list,
-        parse_builtin_op,
-        parse_application,
         parse_identifier,
-        parse_function_application,
+        parse_builtin_op
     ))(input)
     {
         Ok((r, m)) => (r, m),
@@ -1169,21 +1180,5 @@ mod tests {
                 MirandaExpr::MirandaInt(1),
             ])
         );
-    }
-
-    #[test]
-    fn parse_function_application_test() {
-        let val = match parse_application("add 1 1") {
-            Ok((_, matched)) => matched,
-            Err(e) => panic!("Failed to parse: {}", e),
-        };
-
-        assert_eq!(
-            val,
-            MirandaExpr::MirandaFunctionApplication(
-                "add".to_string(),
-                vec![MirandaExpr::MirandaInt(1), MirandaExpr::MirandaInt(1)]
-            )
-        )
     }
 }

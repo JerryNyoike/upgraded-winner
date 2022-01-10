@@ -287,18 +287,18 @@ impl Env {
         None
     }
 
-    pub fn binding_value(&self, identifier: &Ident) -> Option<MirandaExpr> {
+    pub fn binding_value(&self, identifier: &Ident) -> Option<Vec<MirandaExpr>> {
         if let Some(x) = self.vars_table.get(identifier) {
-            println!("got");
+            // println!("got");
             match x {
                 VarType(id, _) => {
                     // get the function body from the environment
-                    println!("{} -> {:#?}", id, self.var_values.get(identifier));
+                    // println!("{} -> {:#?}", id, self.var_values.get(identifier));
                     if let Some(var_value) = self.var_values.get(id) {
-                        Some(var_value)
+                        return Some(var_value.clone());
                     } else {
                         println!("Variable {} declared but not defined", identifier);
-                        None
+                        return None;
                     };
                 }
             }

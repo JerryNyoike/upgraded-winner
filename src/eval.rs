@@ -2,6 +2,7 @@ use crate::reader::parse_expr;
 use crate::types::*;
 use std::any::Any;
 
+
 pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
     use crate::types::{BuiltIn::*, MirandaExpr::*};
 
@@ -52,13 +53,16 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
                         }
                         _ => {
                             // fetch from the vars in the environment
-                            println!("%%%%%%%%%");
-                            println!("{:#?}", env.get_function_env()[0]);
-                            println!("%%%%%%%%%");
+                            // println!("%%%%%%%%%");
+                            // println!("{:#?}", env.get_function_env()[0]);
+                            // println!("%%%%%%%%%");
                             if let Some(bind) = env.binding_value(id) {
-                                Some(bind)
+                                match bind[0].clone() {
+                                    MirandaIdentifier(_) => eval(&bind[0.clone()], env),
+                                    _ => Some(bind[0].clone())
+                                }
                             } else if let Some(local_bind) = env.get_function_env()[0].binding_value(id) {
-                                Some(local_bind)
+                                Some(local_bind[0].clone())
                             } else {
                                 None
                             }
@@ -69,8 +73,8 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
                     // check local environment
                     let ref mut l_env = env.get_function_env();
                     if l_env.len() > 0 {
-                        println!("::::::::::::::");
-                        println!("{:#?}", l_env[0]);  
+                        // println!("::::::::::::::");
+                        // println!("{:#?}", l_env[0]);  
                         let ref mut fn_env = l_env[0];
                         return eval(expr, fn_env);
                     }
@@ -86,6 +90,9 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
             let builtin_op = &built_in_expr[1];
             let val2 = eval(&built_in_expr[2], env);
 
+            // println!("********VAL 2*******");
+            // println!("{:#?}", val2);
+            // println!("********VAL 2*******");
             match builtin_op {
                 MirandaBuiltIn(Plus) => match &val1 {
                     Some(MirandaInt(num1)) => {
@@ -117,7 +124,7 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
                             println!("Cannot combine a list with the type: {:#?}", val2);
                             None
                         }
-                    }
+                    },
                     _ => {
                         println!(
                             "Addition not defined over the types: {:#?}, {:#?}",
@@ -186,6 +193,16 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
                         None
                     }
                 },
+                // MirandaBuiltIn(Bind) => match val1 {
+                //     Some(MirandaIdentifier(ident)) => {
+                //         if let Some(val) = val2 {
+                //             env.set_var_value(ident, val);
+                //             return Some(MirandaBoolean(true));
+                //         }
+                //         return None;
+                //     },
+                //     _ => None
+                // },
                 MirandaBuiltIn(Equal) => match val1 {
                     Some(MirandaBoolean(bool1)) => {
                         if let Some(MirandaBoolean(bool2)) = val2 {
@@ -329,21 +346,27 @@ pub fn eval(expr: &MirandaExpr, env: &mut Env) -> Option<MirandaExpr> {
             match env.lookup(&ident) {
                 Ok(vartype) => {
                     let expr_type = check(&val, env);
-                    match expr_type {
-                        Ok(typ) => {
-                            if typ == vartype.1 {
-                                // same type as declared
-                                env.set_var_value(ident.to_string(), *val.clone());
-                                Some(MirandaBoolean(true))
-                            } else {
+                    if let Some(expr_val) = eval(val, env) {
+                        match expr_type {
+                            Ok(typ) => {
+                                if typ == vartype.1 {
+                                    // same type as declared
+                                    env.set_var_value(ident.to_string(), expr_val);
+                                    Some(MirandaBoolean(true))
+                                } else {
+                                    println!("From Inna hiya bwoys!!!!!!!!!!!!");
+                                    None
+                                }
+                            }
+                            Err(e) => {
+                                println!("Type error: {}", e);
                                 None
                             }
                         }
-                        Err(e) => {
-                            println!("Type error: {}", e);
-                            None
-                        }
+                    } else {
+                        None
                     }
+                    
                 }
                 Err(e) => {
                     println!(
@@ -506,6 +529,11 @@ mod tests {
             test_env,
         );
 
+        let age2_dec = eval(
+            &MirandaBindingDeclaration(VarType("age_2".to_string(), MirandaType::Int)),
+            test_env,
+        );
+
         let ls_dec = eval(
             &MirandaBindingDeclaration(VarType(
                 "stus".to_string(),
@@ -526,6 +554,15 @@ mod tests {
             &MirandaBindingDefinition("age".to_string(), Box::new(MirandaInt(23))),
             test_env,
         );
+
+        let var2_def = eval(
+            &MirandaBindingDefinition("age_2".to_string(), Box::new(MirandaIdentifier("age".to_string()))),
+            test_env
+        );
+
+        let var_val = eval(&MirandaIdentifier("age".to_string()), test_env);
+        let var2_val = eval(&MirandaIdentifier("age_2".to_string()), test_env);
+
         let ls_def = eval(
             &MirandaBindingDefinition(
                 "stus".to_string(),
@@ -588,6 +625,7 @@ mod tests {
         assert_eq!(age_dec, Some(MirandaBoolean(true)));
         assert_eq!(ls_dec, Some(MirandaBoolean(true)));
         assert_eq!(var_def, Some(MirandaBoolean(true)));
+        assert_eq!(var2_def, Some(MirandaBoolean(true)));
         assert_eq!(ls_def, Some(MirandaBoolean(true)));
         assert_eq!(fun_def, Some(MirandaBoolean(true)));
 
@@ -617,5 +655,11 @@ mod tests {
 
         assert_eq!(fun_app, Some(MirandaInt(24)));
         assert_eq!(fun_def, Some(MirandaBoolean(true)));
+        assert_eq!(var_val, Some(MirandaInt(23)));
+        assert_eq!(var2_val, Some(MirandaInt(23)));
+
+        // println!("*******HERE***********");
+        // println!("{:#?}", test_env.binding_value(&"age".to_string()));
+        // println!("*******HERE***********");
     }
 }

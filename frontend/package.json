@@ -1,0 +1,12 @@
+{
+  "name": "wasmiranda",
+  "version": "0.1.0",
+  "files": [
+    "wasmiranda_bg.wasm",
+    "wasmiranda.js",
+    "wasmiranda.d.ts"
+  ],
+  "module": "wasmiranda.js",
+  "types": "wasmiranda.d.ts",
+  "sideEffects": false
+}

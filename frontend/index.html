@@ -1,6 +1,6 @@
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jerry's Miranda</title>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet">
@@ -8,16 +8,21 @@
   <body>
     <script src="elm.js"></script>
     <main></main>
-    <script>
+    <script type="module">
+
      var app = Elm.Main.init({
        node: document.querySelector("main"),
        flags: null,
      });
 
+     import init, {parse_and_eval} from './wasmiranda.js';
+
+	  await init();
+     
      app.ports.sendCode.subscribe(function(code){
        console.log(code);
-       // execute code send back code
-       app.ports.gotResult.send(code);
+      	var result = parse_and_eval(code);
+       app.ports.gotResult.send(result);
      })
     </script>
 </body>
